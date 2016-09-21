@@ -171,7 +171,7 @@ func fileUpdateCheck(t *torrent.Torrent) {
 
 	// do not clear 'completedPieces', and do not pend completed onces. we need to update pieces one by one.
 	t.CancelPieces(0, t.NumPieces())
-	fb := filePendingBitmap(t.Info())
+	fb := filePendingBitmap(t.InfoHash())
 	fb.IterTyped(func(piece int) (more bool) {
 		t.DownloadPieces(piece, piece+1)
 		return true
@@ -202,14 +202,14 @@ func fileUpdateCheck(t *torrent.Torrent) {
 	t.UpdatePiecePriorities()
 }
 
-func filePendingBitmap(info *metainfo.InfoEx) *bitmap.Bitmap {
+func filePendingBitmap(infoHash metainfo.Hash) *bitmap.Bitmap {
 	torrentstorageLock.Lock()
 	defer torrentstorageLock.Unlock()
-	ts := torrentstorage[info.Hash()]
-	return filePendingBitmapTs(info, ts.checks)
+	ts := torrentstorage[infoHash]
+	return filePendingBitmapTs(ts.info, ts.checks)
 }
 
-func filePendingBitmapTs(info *metainfo.InfoEx, checks []bool) *bitmap.Bitmap {
+func filePendingBitmapTs(info *metainfo.Info, checks []bool) *bitmap.Bitmap {
 	var bm bitmap.Bitmap
 
 	var offset int64
@@ -243,7 +243,7 @@ func pendingCompleted(t *torrent.Torrent) bool {
 		return false
 	}
 
-	fb := filePendingBitmap(info)
+	fb := filePendingBitmap(t.InfoHash())
 	return pendingBytesCompleted(t, fb) >= pendingBytesLength(t, fb)
 }
 

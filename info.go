@@ -14,14 +14,17 @@ func TorrentMagnet(i int) string {
 	mu.Lock()
 	defer mu.Unlock()
 	t := torrents[i]
-	return t.Metainfo().Magnet().String()
+	mi := t.Metainfo()
+	name := torrentName(t)
+	return mi.Magnet(name, t.InfoHash()).String()
 }
 
 func TorrentMetainfo(i int) *metainfo.MetaInfo {
 	mu.Lock()
 	defer mu.Unlock()
 	t := torrents[i]
-	return t.Metainfo()
+	mi := t.Metainfo()
+	return &mi
 }
 
 //export TorrentHash
@@ -123,7 +126,7 @@ func TorrentPendingBytesLength(i int) int64 {
 	mu.Lock()
 	defer mu.Unlock()
 	t := torrents[i]
-	fb := filePendingBitmap(t.Info())
+	fb := filePendingBitmap(t.InfoHash())
 	return pendingBytesLength(t, fb)
 }
 
@@ -132,7 +135,7 @@ func TorrentPendingBytesCompleted(i int) int64 {
 	mu.Lock()
 	defer mu.Unlock()
 	t := torrents[i]
-	fb := filePendingBitmap(t.Info())
+	fb := filePendingBitmap(t.InfoHash())
 	return pendingBytesCompleted(t, fb)
 }
 

@@ -47,7 +47,7 @@ func CreateTorrentFileFromMetaInfo() []byte {
 func createTorrentFileFromMetaInfo() []byte {
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
-	err = metainfoBuild.info.Write(w)
+	err = metainfoBuild.metainfo.Write(w)
 	if err != nil {
 		return nil
 	}
@@ -152,7 +152,7 @@ func CreateTorrentFromMetaInfo() int {
 
 	var t *torrent.Torrent
 
-	hash := metainfoBuild.info.Info.Hash()
+	hash := metainfoBuild.metainfo.HashInfoBytes()
 
 	if _, ok := filestorage[hash]; ok {
 		err = errors.New("Already exists")
@@ -161,11 +161,11 @@ func CreateTorrentFromMetaInfo() int {
 
 	fs := registerFileStorage(hash, path.Dir(metainfoBuild.root))
 
-	fs.Comment = metainfoBuild.info.Comment
-	fs.Creator = metainfoBuild.info.CreatedBy
-	fs.CreatedOn = (time.Duration(metainfoBuild.info.CreationDate) * time.Second).Nanoseconds()
+	fs.Comment = metainfoBuild.metainfo.Comment
+	fs.Creator = metainfoBuild.metainfo.CreatedBy
+	fs.CreatedOn = (time.Duration(metainfoBuild.metainfo.CreationDate) * time.Second).Nanoseconds()
 
-	t, err = client.AddTorrent(metainfoBuild.info)
+	t, err = client.AddTorrent(metainfoBuild.metainfo)
 	if err != nil {
 		return -1
 	}
@@ -231,12 +231,14 @@ func AddTorrentFromURL(path string, url string) int {
 		return -1
 	}
 
-	if _, ok := filestorage[mi.Info.Hash()]; ok {
+	hash := mi.HashInfoBytes()
+
+	if _, ok := filestorage[hash]; ok {
 		err = errors.New("Already exists")
 		return -1
 	}
 
-	fs := registerFileStorage(mi.Info.Hash(), path)
+	fs := registerFileStorage(hash, path)
 
 	fs.Comment = mi.Comment
 	fs.Creator = mi.CreatedBy
@@ -269,12 +271,14 @@ func AddTorrent(file string) int {
 		return -1
 	}
 
-	if _, ok := filestorage[mi.Info.Hash()]; ok {
+	hash := mi.HashInfoBytes()
+
+	if _, ok := filestorage[hash]; ok {
 		err = errors.New("Already exists")
 		return -1
 	}
 
-	fs := registerFileStorage(mi.Info.Hash(), path.Dir(file))
+	fs := registerFileStorage(hash, path.Dir(file))
 
 	fs.Comment = mi.Comment
 	fs.Creator = mi.CreatedBy
@@ -305,12 +309,14 @@ func AddTorrentFromBytes(path string, buf []byte) int {
 		return -1
 	}
 
-	if _, ok := filestorage[mi.Info.Hash()]; ok {
+	hash := mi.HashInfoBytes()
+
+	if _, ok := filestorage[hash]; ok {
 		err = errors.New("Already exists")
 		return -1
 	}
 
-	fs := registerFileStorage(mi.Info.Hash(), path)
+	fs := registerFileStorage(hash, path)
 
 	fs.Comment = mi.Comment
 	fs.Creator = mi.CreatedBy
@@ -522,7 +528,7 @@ func CheckTorrent(i int) {
 	ts.completedPieces.Clear()
 	torrentstorageLock.Unlock()
 
-	fb := filePendingBitmap(t.Info())
+	fb := filePendingBitmap(t.InfoHash())
 
 	client.CheckTorrent(t, fb)
 }

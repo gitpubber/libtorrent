@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
 	pp "github.com/anacrolix/torrent/peer_protocol"
 )
@@ -100,7 +101,10 @@ func saveTorrentState(t *torrent.Torrent) ([]byte, error) {
 			CreatedBy:    fs.Creator,
 			AnnounceList: t.AnnounceList(),
 		}
-		s.MetaInfo.Info = *t.Info()
+		s.MetaInfo.InfoBytes, err = bencode.Marshal(t.Info())
+		if err != nil {
+			panic(err)
+		}
 	} else {
 		hash := t.InfoHash()
 		s.InfoHash = &hash
@@ -194,8 +198,8 @@ func loadTorrentState(path string, buf []byte) (t *torrent.Torrent, err error) {
 	ts.root = s.Root
 	torrentstorageLock.Unlock()
 
-	if spec.Info != nil {
-		err = t.LoadInfoBytes(spec.Info.Bytes)
+	if spec.InfoBytes != nil {
+		err = t.LoadInfoBytes(spec.InfoBytes)
 		if err != nil {
 			return
 		}
