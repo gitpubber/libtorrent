@@ -60,7 +60,8 @@ func registerFileStorage(info metainfo.Hash, path string) *fileStorage {
 }
 
 type torrentStorage struct {
-	info            *metainfo.InfoEx
+	info            *metainfo.Info
+	infoHash        metainfo.Hash
 	path            string
 	checks          []bool
 	completedPieces bitmap.Bitmap
@@ -113,12 +114,18 @@ type fileTorrentStorage struct {
 	ts *torrentStorage
 }
 
-func (m *torrentOpener) OpenTorrent(info *metainfo.InfoEx) (storage.Torrent, error) {
+func (m *torrentOpener) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash) (storage.TorrentImpl, error) {
 	torrentstorageLock.Lock()
 	defer torrentstorageLock.Unlock()
 
-	ts := torrentstorage[info.Hash()]
+	ts := torrentstorage[infoHash]
 	ts.info = info
+	ts.infoHash = infoHash
+
+	err := storage.CreateNativeZeroLengthFiles(info, ts.path)
+	if err != nil {
+		return nil, err
+	}
 
 	// if we come here from LoadTorrent checks is set. otherwise we come here after torrent open, fill defaults
 	if ts.checks == nil {
@@ -135,11 +142,11 @@ func (m *torrentOpener) OpenTorrent(info *metainfo.InfoEx) (storage.Torrent, err
 }
 
 type fileStorageTorrent struct {
-	info *metainfo.InfoEx
+	info *metainfo.Info
 	ts   *torrentStorage
 }
 
-func (m *fileTorrentStorage) Piece(p metainfo.Piece) storage.Piece {
+func (m *fileTorrentStorage) Piece(p metainfo.Piece) storage.PieceImpl {
 	// Create a view onto the file-based torrent storage.
 	_io := &fileStorageTorrent{
 		p.Info,
@@ -186,6 +193,13 @@ func (m *fileStoragePiece) MarkComplete() error {
 		m.next.Set()
 	}
 
+	return nil
+}
+
+func (m *fileStoragePiece) MarkNotComplete() error {
+	torrentstorageLock.Lock()
+	defer torrentstorageLock.Unlock()
+	m.completedPieces.Set(m.p.Index(), false)
 	return nil
 }
 

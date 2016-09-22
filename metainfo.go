@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/anacrolix/missinggo/slices"
+	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
 )
 
@@ -22,10 +23,11 @@ var (
 )
 
 type metaInfoBuilder struct {
-	root string
-	info *metainfo.MetaInfo
-	pr   *io.PipeReader
-	last int
+	root     string
+	info     *metainfo.Info
+	metainfo *metainfo.MetaInfo
+	pr       *io.PipeReader
+	last     int
 }
 
 var metainfoBuild *metaInfoBuilder
@@ -64,15 +66,16 @@ func CreateMetaInfo(root string) int {
 
 	metainfoBuild = &metaInfoBuilder{}
 
-	metainfoBuild.info = &metainfo.MetaInfo{
+	metainfoBuild.info = &metainfo.Info{}
+	metainfoBuild.metainfo = &metainfo.MetaInfo{
 		AnnounceList: builtinAnnounceList,
 	}
 	metainfoBuild.root = root
 
 	var size int64
 
-	metainfoBuild.info.Info.Name = filepath.Base(metainfoBuild.root)
-	metainfoBuild.info.Info.Files = nil
+	metainfoBuild.info.Name = filepath.Base(metainfoBuild.root)
+	metainfoBuild.info.Files = nil
 	err = filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -82,7 +85,7 @@ func CreateMetaInfo(root string) int {
 			return nil
 		} else if path == root {
 			// The root is a file.
-			metainfoBuild.info.Info.Length = fi.Size()
+			metainfoBuild.info.Length = fi.Size()
 			size += fi.Size()
 			return nil
 		}
@@ -90,7 +93,7 @@ func CreateMetaInfo(root string) int {
 		if err != nil {
 			return fmt.Errorf("error getting relative path: %s", err)
 		}
-		metainfoBuild.info.Info.Files = append(metainfoBuild.info.Info.Files, metainfo.FileInfo{
+		metainfoBuild.info.Files = append(metainfoBuild.info.Files, metainfo.FileInfo{
 			Path:   strings.Split(relPath, string(filepath.Separator)),
 			Length: fi.Size(),
 		})
@@ -100,17 +103,17 @@ func CreateMetaInfo(root string) int {
 	if err != nil {
 		return -1
 	}
-	slices.Sort(metainfoBuild.info.Info.Files, func(l, r metainfo.FileInfo) bool {
+	slices.Sort(metainfoBuild.info.Files, func(l, r metainfo.FileInfo) bool {
 		return strings.Join(l.Path, "/") < strings.Join(r.Path, "/")
 	})
 
 	private := false
 
-	metainfoBuild.info.Info.Private = &private
-	metainfoBuild.info.Comment = ""
-	metainfoBuild.info.CreatedBy = "libtorrent"
-	metainfoBuild.info.CreationDate = time.Now().Unix()
-	metainfoBuild.info.Info.PieceLength = bestPieceSize(size)
+	metainfoBuild.info.Private = &private
+	metainfoBuild.info.PieceLength = bestPieceSize(size)
+	metainfoBuild.metainfo.Comment = ""
+	metainfoBuild.metainfo.CreatedBy = "libtorrent"
+	metainfoBuild.metainfo.CreationDate = time.Now().Unix()
 
 	open := func(fi metainfo.FileInfo) (io.ReadCloser, error) {
 		return os.Open(filepath.Join(root, strings.Join(fi.Path, string(filepath.Separator))))
@@ -120,7 +123,7 @@ func CreateMetaInfo(root string) int {
 	metainfoBuild.pr, pw = io.Pipe()
 	go func() {
 		var err error
-		for _, fi := range metainfoBuild.info.Info.UpvertedFiles() {
+		for _, fi := range metainfoBuild.info.UpvertedFiles() {
 			var r io.ReadCloser
 			r, err = open(fi)
 			if err != nil {
@@ -138,8 +141,8 @@ func CreateMetaInfo(root string) int {
 		pw.CloseWithError(err)
 	}()
 
-	s := size / metainfoBuild.info.Info.PieceLength
-	r := size % metainfoBuild.info.Info.PieceLength
+	s := size / metainfoBuild.info.PieceLength
+	r := size % metainfoBuild.info.PieceLength
 	if r > 0 { // remaining peace
 		s++
 	}
@@ -160,7 +163,7 @@ func HashMetaInfo(piece int) bool {
 	}
 
 	hasher := sha1.New()
-	wn, err = io.CopyN(hasher, metainfoBuild.pr, metainfoBuild.info.Info.PieceLength)
+	wn, err = io.CopyN(hasher, metainfoBuild.pr, metainfoBuild.info.PieceLength)
 	if err == io.EOF {
 		err = nil
 	}
@@ -172,20 +175,29 @@ func HashMetaInfo(piece int) bool {
 	if wn == 0 {
 		metainfoBuild.pr.Close()
 		metainfoBuild.pr = nil
-		metainfoBuild.info.Info.UpdateBytes()
+		metainfoBuild.metainfo.InfoBytes, err = bencode.Marshal(metainfoBuild.info)
+		if err != nil {
+			panic(err)
+		}
 		return true
 	}
-	metainfoBuild.info.Info.Pieces = hasher.Sum(metainfoBuild.info.Info.Pieces)
-	if wn < metainfoBuild.info.Info.PieceLength {
+	metainfoBuild.info.Pieces = hasher.Sum(metainfoBuild.info.Pieces)
+	if wn < metainfoBuild.info.PieceLength {
 		metainfoBuild.pr.Close()
 		metainfoBuild.pr = nil
-		metainfoBuild.info.Info.UpdateBytes()
+		metainfoBuild.metainfo.InfoBytes, err = bencode.Marshal(metainfoBuild.info)
+		if err != nil {
+			panic(err)
+		}
 		return true
 	}
 	if piece == metainfoBuild.last {
 		metainfoBuild.pr.Close()
 		metainfoBuild.pr = nil
-		metainfoBuild.info.Info.UpdateBytes()
+		metainfoBuild.metainfo.InfoBytes, err = bencode.Marshal(metainfoBuild.info)
+		if err != nil {
+			panic(err)
+		}
 		return true
 	}
 	return true
