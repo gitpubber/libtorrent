@@ -115,6 +115,9 @@ func queueEngine(t *torrent.Torrent) {
 		}
 		timeout = time.Duration(QueueTimeout) * time.Nanosecond
 		mu.Lock()
+		if _, ok := active[t]; !ok { // engine should be running for active torrents only (two queueEngine on same torrent?)
+			return
+		}
 		if pendingCompleted(t) { // seeding
 			if queueNext(t) {
 				// we been removed, stop queue engine
@@ -151,12 +154,6 @@ func queueEngine(t *torrent.Torrent) {
 // 30 min seeding, download complete, 30 min stole torrent.
 func queueNext(t *torrent.Torrent) bool {
 	now := time.Now().UnixNano()
-	if t != nil { // on stop, it can be nil
-		if _, ok := active[t]; !ok { // suppose to be called for active torrents only (two queueEngine on same torrent?)
-			queue[t] = now
-			return true // requeue. exit
-		}
-	}
 
 	// build active torrent array with activate time
 	q := make(map[int64]*torrent.Torrent)
