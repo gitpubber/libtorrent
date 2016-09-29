@@ -481,13 +481,18 @@ func StopTorrent(i int) {
 
 	t := torrents[i]
 
+	a := false
+	if _, ok := active[t]; ok { // we sholuld not call queueNext on suspend torrent, otherwise it overlap ActiveTorrent
+		a = true
+	}
+
 	stopTorrent(t)
 
 	if pause != nil {
 		return
 	}
 
-	if _, ok := active[t]; ok { // we sholuld not call queueNext on suspend torrent, otherwise it overlap ActiveTorrent
+	if a {
 		queueNext(nil)
 	}
 }
