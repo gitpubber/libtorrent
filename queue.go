@@ -151,9 +151,11 @@ func queueEngine(t *torrent.Torrent) {
 // 30 min seeding, download complete, 30 min stole torrent.
 func queueNext(t *torrent.Torrent) bool {
 	now := time.Now().UnixNano()
-	if _, ok := active[t]; !ok { // suppose to be called for active torrents only (two queueEngine on same torrent?)
-		queue[t] = now
-		return true // requeue. exit
+	if t != nil { // on stop, it can be nil
+		if _, ok := active[t]; !ok { // suppose to be called for active torrents only (two queueEngine on same torrent?)
+			queue[t] = now
+			return true // requeue. exit
+		}
 	}
 
 	// build active torrent array with activate time
