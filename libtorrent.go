@@ -487,7 +487,9 @@ func StopTorrent(i int) {
 		return
 	}
 
-	queueNext(nil)
+	if _, ok := active[t]; ok { // we sholuld not call queueNext on suspend torrent, otherwise it overlap ActiveTorrent
+		queueNext(nil)
+	}
 }
 
 func stopTorrent(t *torrent.Torrent) {
