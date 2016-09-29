@@ -116,7 +116,7 @@ func queueEngine(t *torrent.Torrent) {
 		timeout = time.Duration(QueueTimeout) * time.Nanosecond
 		mu.Lock()
 		if _, ok := active[t]; !ok { // engine should be running for active torrents only (two queueEngine on same torrent?)
-			return
+			return // we sholuld not call queueNext on suspend torrent, otherwise it overlap ActiveTorrent
 		}
 		if pendingCompleted(t) { // seeding
 			if queueNext(t) {
