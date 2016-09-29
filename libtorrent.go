@@ -481,23 +481,15 @@ func StopTorrent(i int) {
 
 	t := torrents[i]
 
-	a := false
-	if _, ok := active[t]; ok { // we sholuld not call queueNext on suspend torrent, otherwise it overlap ActiveTorrent
-		a = true
-	}
-
-	stopTorrent(t)
-
-	if pause != nil {
-		return
-	}
-
-	if a {
+	if stopTorrent(t) {
+		if pause != nil {
+			return
+		}
 		queueNext(nil)
 	}
 }
 
-func stopTorrent(t *torrent.Torrent) {
+func stopTorrent(t *torrent.Torrent) bool {
 	if pause != nil {
 		delete(pause, t)
 	}
@@ -513,11 +505,12 @@ func stopTorrent(t *torrent.Torrent) {
 			fs.DownloadingTime = fs.DownloadingTime + (now - fs.ActivateDate)
 		}
 		fs.ActivateDate = now
+		delete(active, t)
+		return true
 	} else {
 		t.Stop()
+		return false
 	}
-
-	delete(active, t)
 }
 
 // CheckTorrent
