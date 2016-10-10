@@ -15,6 +15,7 @@ import (
 
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
+	"golang.org/x/time/rate"
 )
 
 var (
@@ -37,11 +38,19 @@ func SetClientVersion(str string) {
 }
 
 func SetUploadRate(i int) {
-	clientConfig.UploadRateLimiter.SetLimit(rate.Limit(i))
+	l := rate.Inf
+	if i > 0 {
+		l = rate.Limit(i)
+	}
+	clientConfig.UploadRateLimiter.SetLimit(l)
 }
 
 func SetDownloadRate(i int) {
-	clientConfig.DownloadRateLimiter.SetLimit(rate.Limit(i))
+	l := rate.Inf
+	if i > 0 {
+		l = rate.Limit(i)
+	}
+	clientConfig.DownloadRateLimiter.SetLimit(l)
 }
 
 //export CreateTorrentFileFromMetaInfo
