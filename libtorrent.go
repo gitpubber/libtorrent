@@ -37,20 +37,24 @@ func SetClientVersion(str string) {
 	torrent.ExtendedHandshakeClientVersion = str
 }
 
-func SetUploadRate(i int) {
-	l := rate.Inf
+func limit(i int) *rate.Limiter {
+	l := rate.NewLimiter(rate.Inf, 0)
 	if i > 0 {
-		l = rate.Limit(i)
+		b := i
+		if b < 16*1024 {
+			b = 16 * 1024
+		}
+		l = rate.NewLimiter(rate.Limit(i), b)
 	}
-	clientConfig.UploadRateLimiter.SetLimit(l)
+	return l
+}
+
+func SetUploadRate(i int) {
+	client.SetUploadRate(limit(i))
 }
 
 func SetDownloadRate(i int) {
-	l := rate.Inf
-	if i > 0 {
-		l = rate.Limit(i)
-	}
-	clientConfig.DownloadRateLimiter.SetLimit(l)
+	client.SetDownloadRate(limit(i))
 }
 
 //export CreateTorrentFileFromMetaInfo
@@ -108,8 +112,8 @@ func Create() bool {
 	clientConfig.DefaultStorage = &torrentOpener{}
 	clientConfig.Seed = true
 	clientConfig.ListenAddr = BindAddr
-	clientConfig.UploadRateLimiter = rate.NewLimiter(rate.Inf, 256<<10)
-	clientConfig.DownloadRateLimiter = rate.NewLimiter(rate.Inf, 1<<20)
+	clientConfig.UploadRateLimiter = rate.NewLimiter(rate.Inf, 0)
+	clientConfig.DownloadRateLimiter = rate.NewLimiter(rate.Inf, 0)
 
 	client, err = torrent.NewClient(&clientConfig)
 	if err != nil {
