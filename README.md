@@ -63,6 +63,15 @@ Then import your libtorrent.arr into Android Studio or Eclipse.
 ## Examples
 
 ```go
+package main
+
+import (
+	"log"
+	"time"
+
+	"github.com/axet/libtorrent"
+)
+
 func createTorrentFileExample() {
 	t1 := libtorrent.CreateTorrentFile("/Users/axet/Downloads/Prattchet")
 	ioutil.WriteFile("./test.torrent", t1, 0644)
