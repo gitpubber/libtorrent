@@ -15,6 +15,7 @@ import (
 
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
+	"golang.org/x/time/rate"
 )
 
 var (
@@ -34,6 +35,26 @@ func SetDefaultAnnouncesList(str string) {
 
 func SetClientVersion(str string) {
 	torrent.ExtendedHandshakeClientVersion = str
+}
+
+func limit(i int) *rate.Limiter {
+	l := rate.NewLimiter(rate.Inf, 0)
+	if i > 0 {
+		b := i
+		if b < 16*1024 {
+			b = 16 * 1024
+		}
+		l = rate.NewLimiter(rate.Limit(i), b)
+	}
+	return l
+}
+
+func SetUploadRate(i int) {
+	client.SetUploadRate(limit(i))
+}
+
+func SetDownloadRate(i int) {
+	client.SetDownloadRate(limit(i))
 }
 
 //export CreateTorrentFileFromMetaInfo
@@ -91,6 +112,8 @@ func Create() bool {
 	clientConfig.DefaultStorage = &torrentOpener{}
 	clientConfig.Seed = true
 	clientConfig.ListenAddr = BindAddr
+	clientConfig.UploadRateLimiter = rate.NewLimiter(rate.Inf, 0)
+	clientConfig.DownloadRateLimiter = rate.NewLimiter(rate.Inf, 0)
 
 	client, err = torrent.NewClient(&clientConfig)
 	if err != nil {
@@ -481,23 +504,15 @@ func StopTorrent(i int) {
 
 	t := torrents[i]
 
-	a := false
-	if _, ok := active[t]; ok { // we sholuld not call queueNext on suspend torrent, otherwise it overlap ActiveTorrent
-		a = true
-	}
-
-	stopTorrent(t)
-
-	if pause != nil {
-		return
-	}
-
-	if a {
+	if stopTorrent(t) { // we sholuld not call queueNext on suspend torrent, otherwise it overlap ActiveTorrent
+		if pause != nil {
+			return
+		}
 		queueNext(nil)
 	}
 }
 
-func stopTorrent(t *torrent.Torrent) {
+func stopTorrent(t *torrent.Torrent) bool {
 	if pause != nil {
 		delete(pause, t)
 	}
@@ -513,11 +528,12 @@ func stopTorrent(t *torrent.Torrent) {
 			fs.DownloadingTime = fs.DownloadingTime + (now - fs.ActivateDate)
 		}
 		fs.ActivateDate = now
+		delete(active, t)
+		return true
 	} else {
 		t.Stop()
+		return false
 	}
-
-	delete(active, t)
 }
 
 // CheckTorrent
