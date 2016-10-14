@@ -48,30 +48,32 @@ func TorrentFilesCount(i int) int {
 		v.Offset()
 		p.Length = v.Length()
 
-		b := int(v.Offset() / info.PieceLength)
-		e := int((v.Offset() + v.Length()) / info.PieceLength)
-		r := (v.Offset() + v.Length()) % info.PieceLength
-		if r > 0 { // [b, e)
-			e++
-		}
-		e-- // [b, e]
+		if p.Length > 0 { // skip zero length file
+			b := int(v.Offset() / info.PieceLength)
+			e := int((v.Offset() + v.Length()) / info.PieceLength)
+			r := (v.Offset() + v.Length()) % info.PieceLength
+			if r > 0 { // [b, e)
+				e++
+			}
+			e-- // [b, e]
 
-		// mid length
-		var mid int64
-		// count middle (b,e)
-		for i := b + 1; i < e; i++ {
-			p.BytesCompleted += t.PieceBytesCompleted(i)
-			mid += t.PieceLength(i)
-		}
-		rest := v.Length() - mid
-		// b and e should be counted as 100% of rest, each have 50% value
-		value := t.PieceBytesCompleted(b)/t.PieceLength(b) + t.PieceBytesCompleted(e)/t.PieceLength(e)
+			// mid length
+			var mid int64
+			// count middle (b,e)
+			for i := b + 1; i < e; i++ {
+				p.BytesCompleted += t.PieceBytesCompleted(i)
+				mid += t.PieceLength(i)
+			}
+			rest := v.Length() - mid
+			// b and e should be counted as 100% of rest, each have 50% value
+			value := t.PieceBytesCompleted(b)/t.PieceLength(b) + t.PieceBytesCompleted(e)/t.PieceLength(e)
 
-		// v:2 - rest/1
-		// v:1 - rest/2
-		// v:0 - rest*0
-		if value > 0 {
-			p.BytesCompleted += rest / (2 / value)
+			// v:2 - rest/1
+			// v:1 - rest/2
+			// v:0 - rest*0
+			if value > 0 {
+				p.BytesCompleted += rest / (2 / value)
+			}
 		}
 
 		fs.Files = append(fs.Files, p)
