@@ -107,6 +107,11 @@ func CreateMetaInfo(root string) int {
 		return strings.Join(l.Path, "/") < strings.Join(r.Path, "/")
 	})
 
+	if size == 0 {
+		err = fmt.Errorf("zero torrent size")
+		return -1
+	}
+
 	private := false
 
 	metainfoBuild.info.Private = &private
@@ -143,7 +148,7 @@ func CreateMetaInfo(root string) int {
 
 	s := size / metainfoBuild.info.PieceLength
 	r := size % metainfoBuild.info.PieceLength
-	if r > 0 { // remaining peace
+	if r > 0 { // remaining piece
 		s++
 	}
 	metainfoBuild.last = int(s) - 1
