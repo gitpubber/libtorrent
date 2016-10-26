@@ -110,6 +110,10 @@ var torrentstorageLock sync.Mutex
 type torrentOpener struct {
 }
 
+func (m *torrentOpener) Close() error {
+	return nil
+}
+
 type fileTorrentStorage struct {
 	ts *torrentStorage
 }
