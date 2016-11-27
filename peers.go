@@ -14,11 +14,12 @@ type Peer struct {
 }
 
 const (
-	peerSourceTracker  = '\x00' // It's the default.
-	peerSourceIncoming = 'I'
-	peerSourceDHT      = 'H'
-	peerSourcePEX      = 'X'
-	peerSourceLPD      = 'L'
+	peerSourceTracker         = '\x00' // It's the default.
+	peerSourceIncoming        = "I"
+	peerSourceDHTGetPeers     = "Hg"
+	peerSourceDHTAnnouncePeer = "Ha"
+	peerSourcePEX             = "X"
+	peerSourceLPD             = "L"
 )
 
 func TorrentPeersCount(i int) int {
@@ -33,11 +34,11 @@ func TorrentPeersCount(i int) int {
 	for _, v := range t.Peers() {
 		var p string
 		switch v.Source {
-		case peerSourceTracker:
+		default:
 			p = "Tracker"
 		case peerSourceIncoming:
 			p = "Incoming"
-		case peerSourceDHT:
+		case peerSourceDHTGetPeers, peerSourceDHTAnnouncePeer:
 			p = "DHT"
 		case peerSourcePEX:
 			p = "PEX"
