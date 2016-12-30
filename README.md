@@ -55,7 +55,7 @@ Additional features:
 Use within your android gralde project:
 
 ```
-# gomobile bind -o libtorrent.aar github.com/axet/libtorrent
+# gomobile bind -o libtorrent.aar gitlab.com/axet/libtorrent
 ```
 
 Then import your libtorrent.arr into Android Studio or Eclipse.
