@@ -546,9 +546,11 @@ func CheckTorrent(i int) {
 	mu.Lock()
 	defer mu.Unlock()
 	t := torrents[i]
+
 	torrentstorageLock.Lock()
 	ts := torrentstorage[t.InfoHash()]
 	ts.completedPieces.Clear()
+	ts.completed = false
 	torrentstorageLock.Unlock()
 
 	fb := filePendingBitmap(t.InfoHash())
