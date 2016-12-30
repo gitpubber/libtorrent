@@ -44,7 +44,7 @@ Additional features:
 ## Build
 
     # git clone https://github.com/axet/torrent $GOPATH/src/github.com/anacrolix/torrent
-    # go get -u github.com/axet/libtorrent
+    # go get -u gitlab.com/axet/libtorrent
 
 ## Headers
 
@@ -69,7 +69,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/axet/libtorrent"
+	"gitlab.com/axet/libtorrent"
 )
 
 func createTorrentFileExample() {
