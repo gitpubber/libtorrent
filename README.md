@@ -43,7 +43,7 @@ Additional features:
 
 ## Build
 
-    # git clone https://github.com/axet/torrent $GOPATH/src/github.com/anacrolix/torrent
+    # git clone https://gitlab.com/axet/torrent $GOPATH/src/github.com/anacrolix/torrent
     # go get -u gitlab.com/axet/libtorrent
 
 ## Headers
