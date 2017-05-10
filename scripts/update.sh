@@ -1,7 +1,9 @@
 #!/bin/bash
 
+set -e
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-OUT="$DIR/.."
+OUT="$DIR/../"
 
 GOPATH="$OUT"
 
@@ -18,8 +20,10 @@ go_get() {
   return 0
 }
 
-go_get "gitlab.com/axet/torrent" "github.com/anacrolix/torrent" || exit 1
+go_get "gitlab.com/axet/torrent" "github.com/anacrolix/torrent"
 
-go get -u gitlab.com/axet/libtorrent || exit 1
+go get -u gitlab.com/axet/libtorrent
 
-go get -u golang.org/x/mobile/cmd/gomobile || exit 1
+go get -u golang.org/x/mobile/cmd/gomobile
+
+ln -sf "scripts/build.gradle" "$OUT"
