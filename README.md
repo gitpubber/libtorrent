@@ -43,8 +43,8 @@ Additional features:
 
 ## Build
 
-    # git clone https://github.com/axet/torrent $GOPATH/src/github.com/anacrolix/torrent
-    # go get -u github.com/axet/libtorrent
+    # git clone https://gitlab.com/axet/torrent $GOPATH/src/github.com/anacrolix/torrent
+    # go get -u gitlab.com/axet/libtorrent
 
 ## Headers
 
@@ -55,7 +55,7 @@ Additional features:
 Use within your android gralde project:
 
 ```
-# gomobile bind -o libtorrent.aar github.com/axet/libtorrent
+# gomobile bind -o libtorrent.aar gitlab.com/axet/libtorrent
 ```
 
 Then import your libtorrent.arr into Android Studio or Eclipse.
@@ -69,7 +69,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/axet/libtorrent"
+	"gitlab.com/axet/libtorrent"
 )
 
 func createTorrentFileExample() {
