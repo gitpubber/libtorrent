@@ -520,9 +520,10 @@ func stopTorrent(t *torrent.Torrent) bool {
 	fs := filestorage[t.InfoHash()]
 
 	if _, ok := active[t]; ok {
+		s := t.Seeding()
 		t.Drop()
 		now := time.Now().UnixNano()
-		if t.Seeding() {
+		if s {
 			fs.SeedingTime = fs.SeedingTime + (now - fs.ActivateDate)
 		} else {
 			fs.DownloadingTime = fs.DownloadingTime + (now - fs.ActivateDate)
