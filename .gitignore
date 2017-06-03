@@ -1,4 +1,6 @@
 build.gradle
 libtorrent.aar
+libtorrent.aar.asc
+scripts/pom.xml.asc
 pkg
 src

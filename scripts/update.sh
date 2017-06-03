@@ -25,5 +25,3 @@ go_get "gitlab.com/axet/torrent" "github.com/anacrolix/torrent"
 go get -u gitlab.com/axet/libtorrent
 
 go get -u golang.org/x/mobile/cmd/gomobile
-
-ln -sf "scripts/build.gradle" "$OUT"
