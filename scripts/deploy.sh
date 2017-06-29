@@ -7,6 +7,6 @@ ARGS=(-DpomFile=pom.xml -Dfile="$DIR/libtorrent.aar" \
   -DrepositoryId=sonatype-nexus-staging \
   -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/)
 
-mvn gpg:sign-and-deploy-file "${ARGS[@]}"
-
 mvn install:install-file "${ARGS[@]}"
+
+mvn gpg:sign-and-deploy-file "${ARGS[@]}"

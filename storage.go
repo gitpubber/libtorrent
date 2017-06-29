@@ -301,8 +301,8 @@ func (fst *fileStorageTorrent) fileInfoName(fi metainfo.FileInfo) string {
 	torrentstorageLock.Lock()
 	defer torrentstorageLock.Unlock()
 	name := fst.ts.root
-	if name == "" {
-		name = fst.info.Name
+	if name == "" { // torrent hasent been renamed
+		name = fst.info.Name // use original name
 	}
 	return filepath.Join(append([]string{fst.ts.path, name}, fi.Path...)...)
 }
