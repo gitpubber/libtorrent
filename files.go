@@ -41,7 +41,7 @@ func TorrentFilesCount(i int) int {
 	checks := ts.Checks()
 	torrentstorageLock.Unlock()
 
-	for i, v := range t.Files() {
+	for i, v := range t.Files(ts.root) {
 		p := File{}
 		p.Check = checks[i]
 		p.Path = v.Path()
