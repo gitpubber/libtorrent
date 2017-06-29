@@ -14,6 +14,18 @@ import (
 )
 
 var filestorage map[metainfo.Hash]*fileStorage
+var storageExternal FileStorageTorrent
+
+type FileStorageTorrent interface {
+	ReadFileAt(hash string, path string, b []byte, off int64) (n int, err error)
+	WriteFileAt(hash string, path string, b []byte, off int64) (n int, err error)
+}
+
+func TorrentStorageSet(p FileStorageTorrent) {
+	torrentstorageLock.Lock()
+	defer torrentstorageLock.Unlock()
+	storageExternal = p
+}
 
 type fileStorage struct {
 	// dynamic data
@@ -65,7 +77,7 @@ type torrentStorage struct {
 	path            string
 	checks          []bool
 	completedPieces bitmap.Bitmap
-	root            string // rename torrent for root node
+	root            string // new torrent name if renamed
 
 	// fired when torrent downloaded, used for queue engine to roll downloads
 	completed bool
@@ -145,16 +157,12 @@ func (m *torrentOpener) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash)
 	return &fileTorrentStorage{ts}, nil
 }
 
-type fileStorageTorrent struct {
-	info *metainfo.Info
-	ts   *torrentStorage
-}
-
 func (m *fileTorrentStorage) Piece(p metainfo.Piece) storage.PieceImpl {
 	// Create a view onto the file-based torrent storage.
 	_io := &fileStorageTorrent{
 		p.Info,
 		m.ts,
+		m.ts.infoHash.HexString(),
 	}
 	// Return the appropriate segments of this.
 	return &fileStoragePiece{
@@ -207,9 +215,22 @@ func (m *fileStoragePiece) MarkNotComplete() error {
 	return nil
 }
 
+type fileStorageTorrent struct {
+	info *metainfo.Info
+	ts   *torrentStorage
+	hash string // hash string for external calls
+}
+
 // Returns EOF on short or missing file.
 func (fst *fileStorageTorrent) readFileAt(fi metainfo.FileInfo, b []byte, off int64) (n int, err error) {
-	f, err := os.Open(fst.fileInfoName(fi))
+	torrentstorageLock.Lock()
+	path := fst.fileInfoName(fi)
+	s := storageExternal
+	torrentstorageLock.Unlock()
+	if s != nil {
+		return storageExternal.ReadFileAt(fst.hash, path, b, off)
+	}
+	f, err := os.Open(path)
 	if os.IsNotExist(err) {
 		// File missing is treated the same as a short file.
 		err = io.EOF
@@ -275,10 +296,16 @@ func (fst *fileStorageTorrent) WriteAt(p []byte, off int64) (n int, err error) {
 		if int64(n1) > fi.Length-off {
 			n1 = int(fi.Length - off)
 		}
-		name := fst.fileInfoName(fi)
-		os.MkdirAll(filepath.Dir(name), 0770)
+		torrentstorageLock.Lock()
+		path := fst.fileInfoName(fi)
+		s := storageExternal
+		torrentstorageLock.Unlock()
+		if s != nil {
+			return s.WriteFileAt(fst.hash, path, p, off)
+		}
+		os.MkdirAll(filepath.Dir(path), 0770)
 		var f *os.File
-		f, err = os.OpenFile(name, os.O_WRONLY|os.O_CREATE, 0660)
+		f, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0660)
 		if err != nil {
 			return
 		}
@@ -298,10 +325,8 @@ func (fst *fileStorageTorrent) WriteAt(p []byte, off int64) (n int, err error) {
 }
 
 func (fst *fileStorageTorrent) fileInfoName(fi metainfo.FileInfo) string {
-	torrentstorageLock.Lock()
-	defer torrentstorageLock.Unlock()
 	name := fst.ts.root
-	if name == "" { // torrent hasent been renamed
+	if name == "" { // torrent hasen't been renamed
 		name = fst.info.Name // use original name
 	}
 	return filepath.Join(append([]string{fst.ts.path, name}, fi.Path...)...)
