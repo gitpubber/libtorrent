@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.github.axet</groupId>
   <artifactId>libtorrent</artifactId>
-  <version>0.7.7</version>
+  <version>0.8.0</version>
   <packaging>aar</packaging>
   <name>android torrent library</name>
   <description>android torrent library</description>
