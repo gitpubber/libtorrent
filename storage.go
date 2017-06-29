@@ -17,7 +17,8 @@ var filestorage map[metainfo.Hash]*fileStorage
 var storageExternal FileStorageTorrent
 
 type FileStorageTorrent interface {
-	ReadFileAt(hash string, path string, b []byte, off int64) (n int, err error)
+	CreateNativeZeroLengthFiles(hash string) error
+	ReadFileAt(hash string, path string, l int, off int64) (buf []byte, err error) // java unable to change buf if it passed as a parameter
 	WriteFileAt(hash string, path string, b []byte, off int64) (n int, err error)
 }
 
@@ -138,9 +139,16 @@ func (m *torrentOpener) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash)
 	ts.info = info
 	ts.infoHash = infoHash
 
-	err := storage.CreateNativeZeroLengthFiles(info, ts.path)
-	if err != nil {
-		return nil, err
+	if storageExternal != nil {
+		err := storageExternal.CreateNativeZeroLengthFiles(infoHash.HexString())
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := storage.CreateNativeZeroLengthFiles(info, ts.path)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// if we come here from LoadTorrent checks is set. otherwise we come here after torrent open, fill defaults
@@ -224,11 +232,14 @@ type fileStorageTorrent struct {
 // Returns EOF on short or missing file.
 func (fst *fileStorageTorrent) readFileAt(fi metainfo.FileInfo, b []byte, off int64) (n int, err error) {
 	torrentstorageLock.Lock()
-	path := fst.fileInfoName(fi)
+	rel := fst.fileRel(fi)
+	path := fst.fileRoot(rel)
 	s := storageExternal
 	torrentstorageLock.Unlock()
 	if s != nil {
-		return storageExternal.ReadFileAt(fst.hash, path, b, off)
+		s, err1 := storageExternal.ReadFileAt(fst.hash, rel, len(b), off)
+		copy(b, s)
+		return len(s), err1
 	}
 	f, err := os.Open(path)
 	if os.IsNotExist(err) {
@@ -297,25 +308,30 @@ func (fst *fileStorageTorrent) WriteAt(p []byte, off int64) (n int, err error) {
 			n1 = int(fi.Length - off)
 		}
 		torrentstorageLock.Lock()
-		path := fst.fileInfoName(fi)
+		rel := fst.fileRel(fi)
+		path := fst.fileRoot(rel)
 		s := storageExternal
 		torrentstorageLock.Unlock()
 		if s != nil {
-			return s.WriteFileAt(fst.hash, path, p, off)
-		}
-		os.MkdirAll(filepath.Dir(path), 0770)
-		var f *os.File
-		f, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0660)
-		if err != nil {
-			return
-		}
-		n1, err = f.WriteAt(p[:n1], off)
-		f.Close()
-		if err != nil {
-			return
+			n1, err = s.WriteFileAt(fst.hash, rel, p[:n1], off)
+			if err != nil {
+				return
+			}
+		} else {
+			os.MkdirAll(filepath.Dir(path), 0770)
+			var f *os.File
+			f, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0660)
+			if err != nil {
+				return
+			}
+			n1, err = f.WriteAt(p[:n1], off)
+			f.Close()
+			if err != nil {
+				return
+			}
 		}
 		n += n1
-		off = 0
+		off = 0 // next file offset
 		p = p[n1:]
 		if len(p) == 0 {
 			break
@@ -324,10 +340,14 @@ func (fst *fileStorageTorrent) WriteAt(p []byte, off int64) (n int, err error) {
 	return
 }
 
-func (fst *fileStorageTorrent) fileInfoName(fi metainfo.FileInfo) string {
+func (fst *fileStorageTorrent) fileRel(fi metainfo.FileInfo) string {
 	name := fst.ts.root
 	if name == "" { // torrent hasen't been renamed
 		name = fst.info.Name // use original name
 	}
-	return filepath.Join(append([]string{fst.ts.path, name}, fi.Path...)...)
+	return filepath.Join(append([]string{name}, fi.Path...)...)
+}
+
+func (fst *fileStorageTorrent) fileRoot(rel string) string {
+	return filepath.Join(append([]string{fst.ts.path}, rel)...)
 }
