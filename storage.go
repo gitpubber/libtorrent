@@ -17,7 +17,7 @@ var filestorage map[metainfo.Hash]*fileStorage
 var storageExternal FileStorageTorrent
 
 type FileStorageTorrent interface {
-	CreateNativeZeroLengthFiles(hash string) error
+	CreateZeroLengthFile(hash string, rel string) error
 	ReadFileAt(hash string, path string, l int, off int64) (buf []byte, err error) // java unable to change buf if it passed as a parameter
 	WriteFileAt(hash string, path string, b []byte, off int64) (n int, err error)
 }
@@ -197,9 +197,15 @@ func (m *fileStoragePiece) MarkComplete() error {
 
 	// create zero flies only once, after torrent downloaded
 	if storageExternal != nil {
-		err := storageExternal.CreateNativeZeroLengthFiles(m.infoHash.HexString())
-		if err != nil {
-			return err
+		for _, fi := range m.info.UpvertedFiles() {
+			if fi.Length != 0 {
+				continue
+			}
+			name := filepath.Join(append([]string{m.info.Name}, fi.Path...)...)
+			err := storageExternal.CreateZeroLengthFile(m.infoHash.HexString(), name)
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		err := storage.CreateNativeZeroLengthFiles(m.info, m.path)
