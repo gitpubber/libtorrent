@@ -139,18 +139,6 @@ func (m *torrentOpener) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash)
 	ts.info = info
 	ts.infoHash = infoHash
 
-	if storageExternal != nil {
-		err := storageExternal.CreateNativeZeroLengthFiles(infoHash.HexString())
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		err := storage.CreateNativeZeroLengthFiles(info, ts.path)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	// if we come here from LoadTorrent checks is set. otherwise we come here after torrent open, fill defaults
 	if ts.checks == nil {
 		ts.checks = make([]bool, len(info.UpvertedFiles()))
@@ -205,6 +193,19 @@ func (m *fileStoragePiece) MarkComplete() error {
 
 	if m.completed {
 		return nil
+	}
+
+	// create zero flies only once, after torrent downloaded
+	if storageExternal != nil {
+		err := storageExternal.CreateNativeZeroLengthFiles(m.infoHash.HexString())
+		if err != nil {
+			return err
+		}
+	} else {
+		err := storage.CreateNativeZeroLengthFiles(m.info, m.path)
+		if err != nil {
+			return err
+		}
 	}
 
 	m.Completed()
