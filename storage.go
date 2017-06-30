@@ -18,8 +18,20 @@ var storageExternal FileStorageTorrent
 
 type FileStorageTorrent interface {
 	CreateZeroLengthFile(hash string, rel string) error
-	ReadFileAt(hash string, path string, l int, off int64) (buf []byte, err error) // java unable to change buf if it passed as a parameter
+	ReadFileAt(hash string, path string, buf *Buffer, off int64) (n int, err error) // java unable to change buf if it passed as a parameter
 	WriteFileAt(hash string, path string, b []byte, off int64) (n int, err error)
+}
+
+type Buffer struct {
+	buf []byte
+}
+
+func (m *Buffer) Write(b []byte, pos int, len int) (int, error) {
+	return copy(m.buf, b[pos:pos+len]), nil
+}
+
+func (m *Buffer) Length() int {
+	return len(m.buf)
 }
 
 func TorrentStorageSet(p FileStorageTorrent) {
@@ -244,9 +256,7 @@ func (fst *fileStorageTorrent) readFileAt(fi metainfo.FileInfo, b []byte, off in
 	s := storageExternal
 	torrentstorageLock.Unlock()
 	if s != nil {
-		s, err1 := storageExternal.ReadFileAt(fst.hash, rel, len(b), off)
-		copy(b, s)
-		return len(s), err1
+		return storageExternal.ReadFileAt(fst.hash, rel, &Buffer{b}, off)
 	}
 	f, err := os.Open(path)
 	if os.IsNotExist(err) {
