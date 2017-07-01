@@ -80,7 +80,7 @@ func createTorrentFileFromMetaInfo() []byte {
 }
 
 func CreateTorrentFile(root string) []byte {
-	s := CreateMetaInfo(root)
+	s := CreateMetainfoBuilder(&defaultMetainfoBuilder{root: root})
 	for i := 0; i < s; i++ {
 		HashMetaInfo(i)
 	}
@@ -182,7 +182,7 @@ func CreateTorrentFromMetaInfo() int {
 		return -1
 	}
 
-	fs := registerFileStorage(hash, path.Dir(metainfoBuild.root))
+	fs := registerFileStorage(hash, metainfoBuild.b.Root())
 
 	fs.Comment = metainfoBuild.metainfo.Comment
 	fs.Creator = metainfoBuild.metainfo.CreatedBy

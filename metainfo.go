@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -22,22 +23,101 @@ var (
 	}
 )
 
-type metaInfoBuilder struct {
-	root     string
+type MetainfoBuilder interface {
+	Name() string
+	Root() string // root directory / url for torrent register
+	FilesCount() (int, error)
+	FilesName(i int) string
+	FilesLength(i int) int64
+	ReadFileAt(path string, buf *Buffer, off int64) (n int, err error) // java unable to change buf if it passed as a parameter
+}
+
+type metainfoBuilderReader struct {
+	b    MetainfoBuilder
+	path string
+	off  int64
+}
+
+func (m *metainfoBuilderReader) Read(p []byte) (n int, err error) {
+	n, err = m.b.ReadFileAt(m.path, &Buffer{p}, m.off)
+	m.off = m.off + int64(n)
+	return n, err
+}
+
+func (m *metainfoBuilderReader) Close() error {
+	return nil
+}
+
+type defaultMetainfoBuilder struct {
+	root string
+	fn   []string
+	fl   []int64
+}
+
+func (m *defaultMetainfoBuilder) Name() string {
+	return filepath.Base(m.root)
+}
+
+func (m *defaultMetainfoBuilder) Root() string {
+	return path.Dir(m.root)
+}
+
+func (m *defaultMetainfoBuilder) FilesCount() (int, error) {
+	err = filepath.Walk(m.root, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if fi.IsDir() { // Directories are implicit in torrent files.
+			return nil
+		} else if path == m.root { // The root is a file.
+			return nil
+		}
+		relPath, err := filepath.Rel(m.root, path)
+		if err != nil {
+			return fmt.Errorf("error getting relative path: %s", err)
+		}
+		m.fn = append(m.fn, relPath)
+		m.fl = append(m.fl, fi.Size())
+		return nil
+	})
+	return len(m.fn), err
+}
+
+func (m *defaultMetainfoBuilder) FilesName(i int) string {
+	return m.fn[i]
+}
+
+func (m *defaultMetainfoBuilder) FilesLength(i int) int64 {
+	return m.fl[i]
+}
+
+func (m *defaultMetainfoBuilder) ReadFileAt(path string, buf *Buffer, off int64) (n int, err error) {
+	f, err := os.Open(filepath.Join(m.root, path))
+	if err != nil {
+		return 0, err
+	}
+	_, err = f.Seek(off, io.SeekStart)
+	if err != nil {
+		return 0, err
+	}
+	return f.Read(buf.buf)
+}
+
+type metainfoBuilder struct {
+	b        MetainfoBuilder
 	info     *metainfo.Info
 	metainfo *metainfo.MetaInfo
 	pr       *io.PipeReader
 	last     int
 }
 
-var metainfoBuild *metaInfoBuilder
+var metainfoBuild *metainfoBuilder
 
 // transmissionbt/makemeta.c
 func bestPieceSize(totalSize int64) int64 {
 	var KiB int64 = 1024
 	var MiB int64 = 1048576
 	var GiB int64 = 1073741824
-
 	if totalSize >= (2 * GiB) {
 		return 2 * MiB
 	}
@@ -60,52 +140,49 @@ func bestPieceSize(totalSize int64) int64 {
 }
 
 //export CreateMetaInfo
-func CreateMetaInfo(root string) int {
+func CreateMetainfo(root string) int {
+	return CreateMetainfoBuilder(&defaultMetainfoBuilder{root: root})
+}
+
+//export CreateMetaInfo
+func CreateMetainfoBuilder(b MetainfoBuilder) int {
 	mu.Lock()
 	defer mu.Unlock()
 
-	metainfoBuild = &metaInfoBuilder{}
+	metainfoBuild = &metainfoBuilder{}
 
 	metainfoBuild.info = &metainfo.Info{}
 	metainfoBuild.metainfo = &metainfo.MetaInfo{
 		AnnounceList: builtinAnnounceList,
 	}
-	metainfoBuild.root = root
+	metainfoBuild.b = b
 
-	var size int64
+	var size int64 = 0
 
-	metainfoBuild.info.Name = filepath.Base(metainfoBuild.root)
+	metainfoBuild.info.Name = b.Name()
 	metainfoBuild.info.Files = nil
-	err = filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if fi.IsDir() {
-			// Directories are implicit in torrent files.
-			return nil
-		} else if path == root {
-			// The root is a file.
-			metainfoBuild.info.Length = fi.Size()
-			size += fi.Size()
-			return nil
-		}
-		relPath, err := filepath.Rel(root, path)
-		if err != nil {
-			return fmt.Errorf("error getting relative path: %s", err)
-		}
+	var c int
+	c, err = b.FilesCount()
+	if err != nil {
+		return -1
+	}
+	for i := 0; i < c; i++ {
 		metainfoBuild.info.Files = append(metainfoBuild.info.Files, metainfo.FileInfo{
-			Path:   strings.Split(relPath, string(filepath.Separator)),
-			Length: fi.Size(),
+			Path:   strings.Split(b.FilesName(i), string(filepath.Separator)),
+			Length: b.FilesLength(i),
 		})
-		size += fi.Size()
-		return nil
-	})
+		size = size + b.FilesLength(i)
+	}
 	if err != nil {
 		return -1
 	}
 	slices.Sort(metainfoBuild.info.Files, func(l, r metainfo.FileInfo) bool {
 		return strings.Join(l.Path, "/") < strings.Join(r.Path, "/")
 	})
+
+	if c == 1 {
+		metainfoBuild.info.Length = size // size of the file in bytes (only when one file is being shared)
+	}
 
 	if size == 0 {
 		err = fmt.Errorf("zero torrent size")
@@ -121,7 +198,7 @@ func CreateMetaInfo(root string) int {
 	metainfoBuild.metainfo.CreationDate = time.Now().Unix()
 
 	open := func(fi metainfo.FileInfo) (io.ReadCloser, error) {
-		return os.Open(filepath.Join(root, strings.Join(fi.Path, string(filepath.Separator))))
+		return &metainfoBuilderReader{b: b, path: filepath.Join(strings.Join(fi.Path, string(filepath.Separator)))}, nil
 	}
 
 	var pw *io.PipeWriter
