@@ -166,12 +166,17 @@ func CreateMetainfoBuilder(b MetainfoBuilder) int {
 	if err != nil {
 		return -1
 	}
-	for i := 0; i < c; i++ {
-		metainfoBuild.info.Files = append(metainfoBuild.info.Files, metainfo.FileInfo{
-			Path:   strings.Split(b.FilesName(i), string(filepath.Separator)),
-			Length: b.FilesLength(i),
-		})
-		size = size + b.FilesLength(i)
+	if c == 1 {
+		size = b.FilesLength(0)
+		metainfoBuild.info.Length = size // size of the file in bytes (only when one file is being shared)
+	} else {
+		for i := 0; i < c; i++ {
+			metainfoBuild.info.Files = append(metainfoBuild.info.Files, metainfo.FileInfo{
+				Path:   strings.Split(b.FilesName(i), string(filepath.Separator)),
+				Length: b.FilesLength(i),
+			})
+			size = size + b.FilesLength(i)
+		}
 	}
 	if err != nil {
 		return -1
@@ -179,10 +184,6 @@ func CreateMetainfoBuilder(b MetainfoBuilder) int {
 	slices.Sort(metainfoBuild.info.Files, func(l, r metainfo.FileInfo) bool {
 		return strings.Join(l.Path, "/") < strings.Join(r.Path, "/")
 	})
-
-	if c == 1 {
-		metainfoBuild.info.Length = size // size of the file in bytes (only when one file is being shared)
-	}
 
 	if size == 0 {
 		err = fmt.Errorf("zero torrent size")
@@ -198,7 +199,8 @@ func CreateMetainfoBuilder(b MetainfoBuilder) int {
 	metainfoBuild.metainfo.CreationDate = time.Now().Unix()
 
 	open := func(fi metainfo.FileInfo) (io.ReadCloser, error) {
-		return &metainfoBuilderReader{b: b, path: filepath.Join(strings.Join(fi.Path, string(filepath.Separator)))}, nil
+		name := metainfoBuild.info.Name // use original name
+		return &metainfoBuilderReader{b: b, path: filepath.Join(strings.Join(append([]string{name}, fi.Path...), string(filepath.Separator)))}, nil
 	}
 
 	var pw *io.PipeWriter
