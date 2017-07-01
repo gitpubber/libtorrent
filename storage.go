@@ -22,6 +22,12 @@ type FileStorageTorrent interface {
 	WriteFileAt(hash string, path string, b []byte, off int64) (n int, err error)
 }
 
+func TorrentStorageSet(p FileStorageTorrent) {
+	torrentstorageLock.Lock()
+	defer torrentstorageLock.Unlock()
+	storageExternal = p
+}
+
 type Buffer struct {
 	buf []byte
 }
@@ -32,12 +38,6 @@ func (m *Buffer) Write(b []byte, pos int, len int) (int, error) {
 
 func (m *Buffer) Length() int {
 	return len(m.buf)
-}
-
-func TorrentStorageSet(p FileStorageTorrent) {
-	torrentstorageLock.Lock()
-	defer torrentstorageLock.Unlock()
-	storageExternal = p
 }
 
 type fileStorage struct {
