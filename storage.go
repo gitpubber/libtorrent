@@ -20,6 +20,7 @@ type FileStorageTorrent interface {
 	CreateZeroLengthFile(hash string, rel string) error
 	ReadFileAt(hash string, path string, buf *Buffer, off int64) (n int, err error) // java unable to change buf if it passed as a parameter
 	WriteFileAt(hash string, path string, b []byte, off int64) (n int, err error)
+	Remove(hash string, path string) error
 }
 
 func TorrentStorageSet(p FileStorageTorrent) {

@@ -270,3 +270,52 @@ func pendingBytesCompleted(t *torrent.Torrent, fb *bitmap.Bitmap) int64 {
 
 	return b
 }
+
+//export TorrentFileDeleteUnselected
+func TorrentFileDeleteUnselected(i int) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	t := torrents[i]
+
+	hash := t.InfoHash()
+
+	torrentstorageLock.Lock()
+	defer torrentstorageLock.Unlock()
+	ts := torrentstorage[hash]
+
+	info := ts.info
+	checks := ts.checks
+
+	bm := filePendingBitmapTs(info, checks)
+
+	var offset int64
+	for i, fi := range info.UpvertedFiles() {
+		s := offset / info.PieceLength
+		e := (offset + fi.Length) / info.PieceLength
+		r := (offset + fi.Length) % info.PieceLength
+		if r > 0 {
+			e++
+		}
+		if !checks[i] && !bm.Contains(int(s)) && !bm.Contains(int(e)) {
+			name := ts.root
+			if name == "" { // torrent havent been renamed
+				name = ts.info.Name
+			}
+			rel := filepath.Join(append([]string{name}, fi.Path...)...)
+			if storageExternal != nil {
+				err = storageExternal.Remove(hash.HexString(), rel)
+				if err != nil {
+					return
+				}
+			} else {
+				old := filepath.Join(append([]string{ts.path}, rel)...)
+				err = os.Remove(old)
+				if err != nil {
+					return
+				}
+			}
+		}
+		offset += fi.Length
+	}
+}
