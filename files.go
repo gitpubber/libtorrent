@@ -110,6 +110,25 @@ func TorrentFilesCheck(i int, p int, b bool) {
 	fileUpdateCheck(t)
 }
 
+func TorrentFilesCheckAll(i int, b bool) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	t := torrents[i]
+	fs := filestorage[t.InfoHash()]
+
+	torrentstorageLock.Lock()
+	ts := torrentstorage[t.InfoHash()]
+	for p := 0; p < len(fs.Files); p++ {
+		ff := fs.Files[p]
+		ff.Check = b
+		ts.checks[p] = b
+	}
+	torrentstorageLock.Unlock()
+
+	fileUpdateCheck(t)
+}
+
 // TorrentFileRename
 //
 // To implement this we need to keep two Metainfo one for network operations,
