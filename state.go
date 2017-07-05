@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/anacrolix/torrent"
-	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
 	pp "github.com/anacrolix/torrent/peer_protocol"
 )
@@ -92,7 +91,9 @@ type TorrentState struct {
 func saveTorrentState(t *torrent.Torrent) ([]byte, error) {
 	s := TorrentState{Version: 3}
 
-	fs := filestorage[t.InfoHash()]
+	hash := t.InfoHash()
+
+	fs := filestorage[hash]
 
 	if t.Info() != nil {
 		s.MetaInfo = &metainfo.MetaInfo{
@@ -101,12 +102,8 @@ func saveTorrentState(t *torrent.Torrent) ([]byte, error) {
 			CreatedBy:    fs.Creator,
 			AnnounceList: t.AnnounceList(),
 		}
-		s.MetaInfo.InfoBytes, err = bencode.Marshal(t.Info())
-		if err != nil {
-			panic(err)
-		}
+		s.MetaInfo.InfoBytes = t.InfoBytes()
 	} else {
-		hash := t.InfoHash()
 		s.InfoHash = &hash
 		s.Name = t.Name()
 		s.Trackers = t.AnnounceList()
