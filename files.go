@@ -297,6 +297,11 @@ func TorrentFileDeleteUnselected(i int) {
 
 	t := torrents[i]
 
+	torrentFileDeleteUnselected(t)
+	fileUpdateCheck(t)
+}
+
+func torrentFileDeleteUnselected(t *torrent.Torrent) {
 	hash := t.InfoHash()
 
 	torrentstorageLock.Lock()
@@ -338,6 +343,4 @@ func TorrentFileDeleteUnselected(i int) {
 		}
 		offset += fi.Length
 	}
-	
-	fileUpdateCheck(t)
 }
