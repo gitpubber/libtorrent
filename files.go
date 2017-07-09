@@ -301,7 +301,6 @@ func TorrentFileDeleteUnselected(i int) {
 	if err != nil {
 		return
 	}
-	t.UpdateAllPieceCompletions()
 	fileUpdateCheck(t)
 }
 
@@ -344,6 +343,7 @@ func torrentFileDeleteUnselected(t *torrent.Torrent) error {
 				}
 			}
 			ts.completedPieces.RemoveRange(int(s), int(e))
+			t.RemoveCompleted(int(s), int(e))
 		}
 		offset += fi.Length
 	}
