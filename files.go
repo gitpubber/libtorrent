@@ -338,4 +338,6 @@ func TorrentFileDeleteUnselected(i int) {
 		}
 		offset += fi.Length
 	}
+	
+	fileUpdateCheck(t)
 }
