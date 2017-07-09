@@ -297,6 +297,14 @@ func TorrentFileDeleteUnselected(i int) {
 
 	t := torrents[i]
 
+	err = torrentFileDeleteUnselected(t)
+	if err != nil {
+		return
+	}
+	fileUpdateCheck(t)
+}
+
+func torrentFileDeleteUnselected(t *torrent.Torrent) error {
 	hash := t.InfoHash()
 
 	torrentstorageLock.Lock()
@@ -323,21 +331,22 @@ func TorrentFileDeleteUnselected(i int) {
 			}
 			rel := filepath.Join(append([]string{name}, fi.Path...)...)
 			if storageExternal != nil {
-				err = storageExternal.Remove(hash.HexString(), rel)
+				err := storageExternal.Remove(hash.HexString(), rel)
 				if err != nil {
-					return
+					return err
 				}
 			} else {
 				old := filepath.Join(append([]string{ts.path}, rel)...)
-				err = os.Remove(old)
+				err := os.Remove(old)
 				if err != nil {
-					return
+					return err
 				}
 			}
 			ts.completedPieces.RemoveRange(int(s), int(e))
+			t.RemoveCompleted(int(s), int(e))
 		}
 		offset += fi.Length
 	}
-	
-	fileUpdateCheck(t)
+
+	return nil
 }
