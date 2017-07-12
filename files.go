@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/anacrolix/missinggo/bitmap"
@@ -132,36 +133,20 @@ func TorrentFilesCheckAll(i int, b bool) {
 
 // https://stackoverflow.com/questions/28734455/java-converting-file-pattern-to-regular-expression-pattern
 func wildcardToRegex(wildcard string) string {
-	s := ""
-	s += "^"
+	s := "^"
 	for _, c := range wildcard {
 		switch c {
 		case '*':
 			s += ".*"
-			break
 		case '?':
 			s += "."
-			break
 		case '^': // escape character in cmd.exe
 			s += "\\"
-			break
-			// escape special regexp-characters
-		case '(':
-		case ')':
-		case '[':
-		case ']':
-		case '$':
-		case '.':
-		case '{':
-		case '}':
-		case '|':
-		case '\\':
+		case '(', ')', '[', ']', '$', '.', '{', '}', '|', '\\': // escape special regexp-characters
 			s += "\\"
 			s += string(c)
-			break
 		default:
 			s += string(c)
-			break
 		}
 	}
 	s += "$"
@@ -181,7 +166,7 @@ func TorrentFilesCheckFilter(i int, filter string, b bool) {
 	ts := torrentstorage[t.InfoHash()]
 	for p := 0; p < len(fs.Files); p++ {
 		ff := fs.Files[p]
-		if m.MatchString(ff.Path) {
+		if m.MatchString(strings.ToLower(ff.Path)) {
 			ff.Check = b     // runtime data
 			ts.checks[p] = b // storage
 		}
