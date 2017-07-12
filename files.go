@@ -160,7 +160,7 @@ func TorrentFilesCheckFilter(i int, filter string, b bool) {
 	t := torrents[i]
 	fs := filestorage[t.InfoHash()]
 
-	m := regexp.MustCompile(wildcardToRegex(filter))
+	m := regexp.MustCompile(wildcardToRegex(strings.ToLower(filter)))
 
 	torrentstorageLock.Lock()
 	ts := torrentstorage[t.InfoHash()]
