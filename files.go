@@ -26,8 +26,6 @@ func TorrentFilesCount(i int) int {
 	t := torrents[i]
 	fs := filestorage[t.InfoHash()]
 
-	fs.Files = nil
-
 	fs.Files = torrentFiles(t)
 
 	return len(fs.Files)
@@ -134,8 +132,8 @@ func TorrentFilesCheckAll(i int, b bool) {
 	if files == nil {
 		files = torrentFiles(t)
 	}
-	for p := 0; p < len(fs.Files); p++ {
-		ff := fs.Files[p]
+	for p := 0; p < len(files); p++ {
+		ff := files[p]
 		ff.Check = b
 		ts.checks[p] = b
 	}
@@ -182,7 +180,7 @@ func TorrentFilesCheckFilter(i int, filter string, b bool) {
 		files = torrentFiles(t)
 	}
 	for p := 0; p < len(files); p++ {
-		ff := fs.Files[p]
+		ff := files[p]
 		if m.MatchString(strings.ToLower(ff.Path)) {
 			ff.Check = b     // runtime data
 			ts.checks[p] = b // storage
