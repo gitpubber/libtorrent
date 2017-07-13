@@ -28,9 +28,15 @@ func TorrentFilesCount(i int) int {
 
 	fs.Files = nil
 
+	fs.Files = torrentFiles(t)
+
+	return len(fs.Files)
+}
+
+func torrentFiles(t *torrent.Torrent) []File {
 	info := t.Info()
 	if info == nil {
-		return 0
+		return nil
 	}
 
 	// we can copy it here, or unlock MarkComplete() operation in the client.go
@@ -42,6 +48,8 @@ func TorrentFilesCount(i int) int {
 	ts := torrentstorage[t.InfoHash()]
 	checks := ts.Checks()
 	torrentstorageLock.Unlock()
+
+	var files []File
 
 	for i, v := range t.Files(ts.root) {
 		p := File{}
@@ -78,9 +86,10 @@ func TorrentFilesCount(i int) int {
 			}
 		}
 
-		fs.Files = append(fs.Files, p)
+		files = append(files, p)
 	}
-	return len(fs.Files)
+
+	return files
 }
 
 // return torrent files array
@@ -121,6 +130,10 @@ func TorrentFilesCheckAll(i int, b bool) {
 
 	torrentstorageLock.Lock()
 	ts := torrentstorage[t.InfoHash()]
+	files := fs.Files
+	if files == nil {
+		files = torrentFiles(t)
+	}
 	for p := 0; p < len(fs.Files); p++ {
 		ff := fs.Files[p]
 		ff.Check = b
@@ -164,7 +177,11 @@ func TorrentFilesCheckFilter(i int, filter string, b bool) {
 
 	torrentstorageLock.Lock()
 	ts := torrentstorage[t.InfoHash()]
-	for p := 0; p < len(fs.Files); p++ {
+	files := fs.Files
+	if files == nil {
+		files = torrentFiles(t)
+	}
+	for p := 0; p < len(files); p++ {
 		ff := fs.Files[p]
 		if m.MatchString(strings.ToLower(ff.Path)) {
 			ff.Check = b     // runtime data

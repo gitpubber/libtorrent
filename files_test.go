@@ -1,21 +1,45 @@
 package libtorrent
 
 import (
-	"log"
 	"regexp"
 	"testing"
 )
 
 func TestWildcast(t *testing.T) {
-	m := regexp.MustCompile(wildcardToRegex("*.mp3"))
+	var m *regexp.Regexp
 	var s string
+
+	m = regexp.MustCompile(wildcardToRegex("*.mp3"))
 	s = "test/abc/123.mp3"
-	log.Println(s, m.MatchString(s))
+	if !m.MatchString(s) {
+		t.Error(s, m.MatchString(s))
+	}
+
 	s = "123.mp3"
-	log.Println(s, m.MatchString(s))
+	if !m.MatchString(s) {
+		t.Error(s, m.MatchString(s))
+	}
+
 	s = "123.mp4"
-	log.Println(s, m.MatchString(s))
-	m2 := regexp.MustCompile(wildcardToRegex("*64kb.mp3"))
+	if m.MatchString(s) {
+		t.Error(s, m.MatchString(s))
+	}
+
+	m = regexp.MustCompile(wildcardToRegex("*64kb.mp3"))
 	s = "test/abc/123_64kb.mp3"
-	log.Println(wildcardToRegex("*64kb.mp3"), s, m2.MatchString(s))
+	if !m.MatchString(s) {
+		t.Error(wildcardToRegex("*64kb.mp3"), s, m.MatchString(s))
+	}
+
+	m = regexp.MustCompile(wildcardToRegex("test/*"))
+	s = "test/abc/123_64kb.mp3"
+	if !m.MatchString(s) {
+		t.Error(s, m.MatchString(s))
+	}
+
+	m = regexp.MustCompile(wildcardToRegex("test/*"))
+	s = "test2/abc/123_64kb.mp3"
+	if m.MatchString(s) {
+		t.Error(s, m.MatchString(s))
+	}
 }
