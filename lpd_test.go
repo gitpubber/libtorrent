@@ -3,7 +3,6 @@ package libtorrent
 import (
 	"bufio"
 	"bytes"
-	"log"
 	"net/http"
 	"testing"
 )
@@ -20,15 +19,15 @@ cookie: name=value
 `
 	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader([]byte(html))))
 	if err != nil {
-		log.Println("receiver", err)
+		t.Error("receiver", err)
 		return
 	}
 	var ihs []string = req.Header[http.CanonicalHeaderKey("Infohash")]
 	if ihs == nil {
-		log.Println("receiver", "No Infohash")
+		t.Error("receiver", "No Infohash")
 		return
 	}
 	for _, ih := range ihs {
-		log.Println(ih)
+		t.Log(ih)
 	}
 }

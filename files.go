@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/anacrolix/missinggo/bitmap"
@@ -25,11 +26,15 @@ func TorrentFilesCount(i int) int {
 	t := torrents[i]
 	fs := filestorage[t.InfoHash()]
 
-	fs.Files = nil
+	fs.Files = torrentFiles(t)
 
+	return len(fs.Files)
+}
+
+func torrentFiles(t *torrent.Torrent) []File {
 	info := t.Info()
 	if info == nil {
-		return 0
+		return nil
 	}
 
 	// we can copy it here, or unlock MarkComplete() operation in the client.go
@@ -41,6 +46,8 @@ func TorrentFilesCount(i int) int {
 	ts := torrentstorage[t.InfoHash()]
 	checks := ts.Checks()
 	torrentstorageLock.Unlock()
+
+	var files []File
 
 	for i, v := range t.Files(ts.root) {
 		p := File{}
@@ -77,9 +84,10 @@ func TorrentFilesCount(i int) int {
 			}
 		}
 
-		fs.Files = append(fs.Files, p)
+		files = append(files, p)
 	}
-	return len(fs.Files)
+
+	return files
 }
 
 // return torrent files array
@@ -118,10 +126,15 @@ func TorrentFilesCheckAll(i int, b bool) {
 	t := torrents[i]
 	fs := filestorage[t.InfoHash()]
 
+	files := fs.Files
+	if files == nil {
+		files = torrentFiles(t)
+	}
+
 	torrentstorageLock.Lock()
 	ts := torrentstorage[t.InfoHash()]
-	for p := 0; p < len(fs.Files); p++ {
-		ff := fs.Files[p]
+	for p := 0; p < len(files); p++ {
+		ff := files[p]
 		ff.Check = b
 		ts.checks[p] = b
 	}
@@ -132,36 +145,20 @@ func TorrentFilesCheckAll(i int, b bool) {
 
 // https://stackoverflow.com/questions/28734455/java-converting-file-pattern-to-regular-expression-pattern
 func wildcardToRegex(wildcard string) string {
-	s := ""
-	s += "^"
+	s := "^"
 	for _, c := range wildcard {
 		switch c {
 		case '*':
 			s += ".*"
-			break
 		case '?':
 			s += "."
-			break
 		case '^': // escape character in cmd.exe
 			s += "\\"
-			break
-			// escape special regexp-characters
-		case '(':
-		case ')':
-		case '[':
-		case ']':
-		case '$':
-		case '.':
-		case '{':
-		case '}':
-		case '|':
-		case '\\':
+		case '(', ')', '[', ']', '$', '.', '{', '}', '|', '\\': // escape special regexp-characters
 			s += "\\"
 			s += string(c)
-			break
 		default:
 			s += string(c)
-			break
 		}
 	}
 	s += "$"
@@ -175,13 +172,18 @@ func TorrentFilesCheckFilter(i int, filter string, b bool) {
 	t := torrents[i]
 	fs := filestorage[t.InfoHash()]
 
-	m := regexp.MustCompile(wildcardToRegex(filter))
+	m := regexp.MustCompile(wildcardToRegex(strings.ToLower(filter)))
+
+	files := fs.Files
+	if files == nil {
+		files = torrentFiles(t)
+	}
 
 	torrentstorageLock.Lock()
 	ts := torrentstorage[t.InfoHash()]
-	for p := 0; p < len(fs.Files); p++ {
-		ff := fs.Files[p]
-		if m.MatchString(ff.Path) {
+	for p := 0; p < len(files); p++ {
+		ff := files[p]
+		if m.MatchString(strings.ToLower(ff.Path)) {
 			ff.Check = b     // runtime data
 			ts.checks[p] = b // storage
 		}
