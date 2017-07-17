@@ -126,12 +126,13 @@ func TorrentFilesCheckAll(i int, b bool) {
 	t := torrents[i]
 	fs := filestorage[t.InfoHash()]
 
-	torrentstorageLock.Lock()
-	ts := torrentstorage[t.InfoHash()]
 	files := fs.Files
 	if files == nil {
 		files = torrentFiles(t)
 	}
+
+	torrentstorageLock.Lock()
+	ts := torrentstorage[t.InfoHash()]
 	for p := 0; p < len(files); p++ {
 		ff := files[p]
 		ff.Check = b
@@ -173,12 +174,13 @@ func TorrentFilesCheckFilter(i int, filter string, b bool) {
 
 	m := regexp.MustCompile(wildcardToRegex(strings.ToLower(filter)))
 
-	torrentstorageLock.Lock()
-	ts := torrentstorage[t.InfoHash()]
 	files := fs.Files
 	if files == nil {
 		files = torrentFiles(t)
 	}
+
+	torrentstorageLock.Lock()
+	ts := torrentstorage[t.InfoHash()]
 	for p := 0; p < len(files); p++ {
 		ff := files[p]
 		if m.MatchString(strings.ToLower(ff.Path)) {
