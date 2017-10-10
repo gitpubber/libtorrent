@@ -306,7 +306,7 @@ func filePendingBitmapTs(info *metainfo.Info, checks []bool) *bitmap.Bitmap {
 			e++
 		}
 		if checks[i] {
-			bm.AddRange(int(s), int(e))
+			bm.AddRange(int(s), int(e+1)) // [s, e)
 		}
 		offset += fi.Length
 	}

@@ -108,7 +108,7 @@ func Port(i int) string {
 	return clientPorts[i]
 }
 
-func PortCheck() bool {
+func PortCheck() (bool, error) {
 	port := tcpPort
 	if port == "" {
 		// check does not perfome on UDP but what we can do?
@@ -118,12 +118,12 @@ func PortCheck() bool {
 		// ports are not forwarded? using local socket port
 		_, port, err = net.SplitHostPort(clientAddr)
 		if err != nil {
-			return false
+			return false, err
 		}
 	} else {
 		_, port, err = net.SplitHostPort(port)
 		if err != nil {
-			return false
+			return false, err
 		}
 	}
 	url := "http://portcheck.transmissionbt.com/" + port
@@ -131,7 +131,7 @@ func PortCheck() bool {
 	var resp *http.Response
 	resp, err = http.Get(url)
 	if err != nil {
-		return false
+		return false, err
 	}
 	defer resp.Body.Close()
 
@@ -139,7 +139,7 @@ func PortCheck() bool {
 	buf.ReadFrom(resp.Body)
 	s := buf.String()
 
-	return s == "1"
+	return s == "1", nil
 }
 
 func getPort(d nat.Device, proto nat.Protocol, port int, extPort string) (int, error) {
