@@ -306,7 +306,7 @@ func filePendingBitmapTs(info *metainfo.Info, checks []bool) *bitmap.Bitmap {
 			e++
 		}
 		if checks[i] {
-			bm.AddRange(int(s), int(e+1)) // [s, e)
+			bm.AddRange(int(s), int(e)) // [s, e)
 		}
 		offset += fi.Length
 	}
@@ -368,6 +368,14 @@ func TorrentFileDeleteUnselected(i int) {
 	fileUpdateCheck(t)
 }
 
+func bitmapIntersects(bm *bitmap.Bitmap, s int, e int) bool { // original roaring.Intersects hidden by bitmap.Bitmap
+	fb := &bitmap.Bitmap{}
+	fb.AddRange(int(s), int(e))
+	old := fb.Len()
+	fb.Sub(*bm)
+	return fb.Len() != old
+}
+
 func torrentFileDeleteUnselected(t *torrent.Torrent) error {
 	hash := t.InfoHash()
 
@@ -388,7 +396,7 @@ func torrentFileDeleteUnselected(t *torrent.Torrent) error {
 		if r > 0 {
 			e++
 		}
-		if !checks[i] && !bm.Contains(int(s)) && !bm.Contains(int(e)) {
+		if !checks[i] && !bitmapIntersects(bm, int(s), int(e)) {
 			name := ts.root
 			if name == "" { // torrent havent been renamed
 				name = ts.info.Name
