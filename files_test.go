@@ -42,4 +42,10 @@ func TestWildcast(t *testing.T) {
 	if m.MatchString(s) {
 		t.Error(s, m.MatchString(s))
 	}
+
+	m = regexp.MustCompile(wildcardToRegex("test/*"))
+	s = "test/abc/123_64kb.mp3"
+	if !m.MatchString(s) {
+		t.Error(s, m.MatchString(s))
+	}
 }

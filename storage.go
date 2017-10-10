@@ -93,8 +93,7 @@ type torrentStorage struct {
 	completedPieces bitmap.Bitmap
 	root            string // new torrent name if renamed
 
-	// fired when torrent downloaded, used for queue engine to roll downloads
-	completed bool
+	completed bool // fired when torrent downloaded, used for queue engine to roll downloads
 	next      missinggo.Event
 }
 
@@ -120,8 +119,7 @@ func (m *torrentStorage) Completed() {
 
 	m.completed = true
 
-	// run thougth all pieces and check they all present in m.completedPieces
-	fb.IterTyped(func(piece int) (again bool) {
+	fb.IterTyped(func(piece int) (again bool) { // run thougth all pieces and check they all present in m.completedPieces
 		if !m.completedPieces.Contains(piece) {
 			m.completed = false
 			return false
@@ -152,16 +150,14 @@ func (m *torrentOpener) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash)
 	ts.info = info
 	ts.infoHash = infoHash
 
-	// if we come here from LoadTorrent checks is set. otherwise we come here after torrent open, fill defaults
-	if ts.checks == nil {
+	if ts.checks == nil { // if we come here from LoadTorrent checks is set. otherwise we come here after torrent open, fill defaults
 		ts.checks = make([]bool, len(info.UpvertedFiles()))
 		for i, _ := range ts.checks {
 			ts.checks[i] = true
 		}
 	}
 
-	// update comleted after torrent open
-	ts.Completed()
+	ts.Completed() // update comleted after torrent open
 
 	return &fileTorrentStorage{ts}, nil
 }
@@ -208,8 +204,7 @@ func (m *fileStoragePiece) MarkComplete() error {
 		return nil
 	}
 
-	// create zero flies only once, after torrent downloaded
-	if storageExternal != nil {
+	if storageExternal != nil { // create zero flies only once, after torrent downloaded
 		for _, fi := range m.info.UpvertedFiles() {
 			if fi.Length != 0 {
 				continue
@@ -261,16 +256,14 @@ func (fst *fileStorageTorrent) readFileAt(fi metainfo.FileInfo, b []byte, off in
 	}
 	f, err := os.Open(path)
 	if os.IsNotExist(err) {
-		// File missing is treated the same as a short file.
-		err = io.EOF
+		err = io.EOF // File missing is treated the same as a short file.
 		return
 	}
 	if err != nil {
 		return
 	}
 	defer f.Close()
-	// Limit the read to within the expected bounds of this file.
-	if int64(len(b)) > fi.Length-off {
+	if int64(len(b)) > fi.Length-off { // Limit the read to within the expected bounds of this file.
 		b = b[:fi.Length-off]
 	}
 	for off < fi.Length && len(b) != 0 {
