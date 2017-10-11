@@ -15,13 +15,15 @@ import (
 
 // http://bittorrent.org/beps/bep_0019.html
 
-var webseedstorage map[metainfo.Hash]webSeeds
+var webseedstorage map[metainfo.Hash]*webSeeds
 
 func webSeedStart(t *torrent.Torrent) {
 	hash := t.InfoHash()
 	var ws *webSeeds
-	if ws, ok := webseedstorage[hash]; !ok { // currenlty active webseeds for torrent
-		ws = webSeeds{}
+	if w, ok := webseedstorage[hash]; ok { // currenlty active webseeds for torrent
+		ws = w
+	} else {
+		ws = &webSeeds{}
 	}
 
 	torrentstorageLock.Lock()
@@ -31,7 +33,7 @@ func webSeedStart(t *torrent.Torrent) {
 	info := ts.info
 	checks := ts.checks
 
-	PieceLength := info.PieceLength
+	//PieceLength := info.PieceLength
 
 	if ws.uu == nil {
 		uu := t.UrlList() // source urls
@@ -69,7 +71,8 @@ func webSeedStart(t *torrent.Torrent) {
 			})
 			if !done {
 				bm.Sub(*completed)
-				ff = append(ff, &webFile{fi.Path, offset, fi.Length, s, e, bm}) // [s, e)
+				path := strings.Join(append([]string{ts.info.Name}, fi.Path...), "/")
+				ff = append(ff, &webFile{path, offset, fi.Length, int(s), int(e), bm}) // [s, e)
 			}
 		}
 		offset += fi.Length
@@ -80,17 +83,17 @@ func webSeedStart(t *torrent.Torrent) {
 	case 1: // if here is only one unfinished file left and all source urls norange, use only one source
 		norange := true
 		for _, u := range ws.uu {
-			if u.Range {
+			if u.r {
 				norange = false
 			}
 		}
 		if norange { // use only one webSeed
-			ws.add()
+			ws.Add()
 		} else { // use multiple []webSeed
-			ws.adds()
+			ws.Adds()
 		}
 	default: // here multiple files, use multi sources
-		ws.adds()
+		ws.Adds()
 	}
 
 	webseedstorage[hash] = ws
@@ -99,7 +102,7 @@ func webSeedStart(t *torrent.Torrent) {
 func webSeedStop(t *torrent.Torrent) {
 	hash := t.InfoHash()
 	ww := webseedstorage[hash]
-	for _, v := range ww {
+	for _, v := range ww.ww {
 		v.Close()
 	}
 	delete(webseedstorage, hash)
@@ -111,21 +114,21 @@ type webSeeds struct {
 }
 
 func (m *webSeeds) Add() {
-	w := &webSeed{url, t, "", 0, 1}
-	go w.Run()
-	ww = append(ww, w)
-	w = &webSeed{url, t, "", 2, 3}
-	go w.Run()
-	ws.ww = append(ws.ww, w)
+	// w := &webSeed{url, t, "", 0, 1}
+	// go w.Run()
+	// ww = append(ww, w)
+	// w = &webSeed{url, t, "", 2, 3}
+	// go w.Run()
+	// ws.ww = append(ws.ww, w)
 }
 
 func (m *webSeeds) Adds() {
-	for _, w := range ww { // no range. check if we have current file oppened, skip to next
-		w = w
-	}
-	w := &webSeed{url, t, "", -1, -1}
-	go w.Run()
-	ws.ww = append(ws.ww, w)
+	// for _, w := range ww { // no range. check if we have current file oppened, skip to next
+	//     w = w
+	// }
+	// w := &webSeed{url, t, "", -1, -1}
+	// go w.Run()
+	// ws.ww = append(ws.ww, w)
 }
 
 type webFile struct {
@@ -141,7 +144,7 @@ type ByRange []*webUrl
 
 func (m ByRange) Len() int           { return len(m) }
 func (m ByRange) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
-func (m ByRange) Less(i, j int) bool { return m[i].Range && !m[j].Range }
+func (m ByRange) Less(i, j int) bool { return m[i].r && !m[j].r }
 
 var CONTENT_RANGE = regexp.MustCompile("bytes (\\d+)-(\\d+)/(\\d+)")
 
@@ -154,8 +157,8 @@ type webUrl struct {
 }
 
 func (m *webUrl) Extract() {
-	if strings.HasPrefix(m.Url, "http") {
-		req, err := http.NewRequest("GET", m.Url, nil)
+	if strings.HasPrefix(m.url, "http") {
+		req, err := http.NewRequest("GET", m.url, nil)
 		if err != nil {
 			return
 		}
@@ -176,11 +179,11 @@ func (m *webUrl) Extract() {
 		// Content-Range: <unit> */<size>
 		//
 		// Content-Range: bytes 200-1000/67589
-		g := p.FindStringSubmatch(CONTENT_RANGE)
+		g := CONTENT_RANGE.FindStringSubmatch(r)
 		if len(g) > 0 {
-			m.Length, err = strconv.ParseInt(g[3], 10, 64)
+			m.length, err = strconv.ParseInt(g[3], 10, 64)
 		}
-		m.Range = true
+		m.r = true
 	}
 }
 
@@ -194,10 +197,10 @@ type webSeed struct {
 
 func (m *webSeed) Run() {
 	defer m.Close()
-	info := m.T.Info()
+	info := m.t.Info()
 	var r io.Reader
-	if strings.HasPrefix(m.Url.Url, "http") {
-		req, err := http.NewRequest("GET", m.Url.Url, nil)
+	if strings.HasPrefix(m.url.url, "http") {
+		req, err := http.NewRequest("GET", m.url.url, nil)
 		if err != nil {
 			return
 		}
@@ -209,7 +212,7 @@ func (m *webSeed) Run() {
 		// Range: <unit>=<range-start>-<range-end>, <range-start>-<range-end>, <range-start>-<range-end>
 		//
 		// "Range: bytes=200-1000, 2000-6576, 19000-"
-		req.Header.Add("Range", "bytes="+strconv.Itoa(min)+"-"+strconv.Itoa(max-1))
+		//req.Header.Add("Range", "bytes="+strconv.Itoa(min)+"-"+strconv.Itoa(max-1))
 		var client http.Client
 		resp, err := client.Do(req)
 		if err != nil {
