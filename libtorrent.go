@@ -103,6 +103,7 @@ func Create() bool {
 	torrentstorage = make(map[metainfo.Hash]*torrentStorage)
 	queue = make(map[*torrent.Torrent]int64)
 	active = make(map[*torrent.Torrent]int64)
+	webseedstorage = make(map[metainfo.Hash]*webSeeds)
 	pause = nil
 	index = 0
 	tcpPort = ""

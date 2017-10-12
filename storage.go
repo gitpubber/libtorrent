@@ -74,7 +74,6 @@ func registerFileStorage(info metainfo.Hash, path string) *fileStorage {
 
 	fs := &fileStorage{
 		AddedDate: time.Now().UnixNano(),
-
 		Comment:   "dynamic metainfo from client",
 		Creator:   "go.libtorrent",
 		CreatedOn: time.Now().UnixNano(),
