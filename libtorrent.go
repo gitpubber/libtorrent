@@ -435,6 +435,8 @@ func startTorrent(t *torrent.Torrent) bool {
 		fs.DownloadingTime = fs.DownloadingTime + (now - fs.ActivateDate)
 		fs.ActivateDate = now
 
+		webSeedOpen(t)
+
 		fileUpdateCheck(t)
 	}()
 
@@ -530,6 +532,7 @@ func stopTorrent(t *torrent.Torrent) bool {
 		}
 		fs.ActivateDate = now
 		delete(active, t)
+		webSeedClose(t)
 		return true
 	} else {
 		t.Stop()
