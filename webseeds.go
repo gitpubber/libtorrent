@@ -1,6 +1,7 @@
 package libtorrent
 
 import (
+	"context"
 	"math"
 	"net/http"
 	"regexp"
@@ -108,7 +109,7 @@ func webSeedOpen(t *torrent.Torrent) {
 		if !downloading {
 			for _, u := range ws.uu { // choise right url, skip url if it is limited
 				if u == u { // TODO find right url
-					w := &webSeed{t, u, f, f.start, f.end}
+					w := &webSeed{t, u, f, f.start, f.end, nil, nil}
 					ws.ww = append(ws.ww, w)
 					webSeedOpen(t)
 					return
@@ -125,7 +126,7 @@ func webSeedOpen(t *torrent.Torrent) {
 				// split file by two
 				for _, u := range ws.uu { // choise right url, skip url if it is limited
 					if u == u { // TODO find right url
-						w := &webSeed{t, u, f, f.start, f.end}
+						w := &webSeed{t, u, f, f.start, f.end, nil, nil}
 						ws.ww = append(ws.ww, w)
 						webSeedOpen(t)
 						return
@@ -174,7 +175,6 @@ type webUrl struct {
 	url    string // source url
 	r      bool   // http RANGE support?
 	length int64  // file url size (content-size)
-	speed  int    // download bytes per seconds, helps choice best source
 }
 
 func (m *webUrl) Extract() {
@@ -214,18 +214,23 @@ type webSeed struct {
 	file  *webFile // current file
 	start int      // start piece number (can be bigger then file.start)
 	end   int      // end piece number (can be lower then file.end)
+
+	req    *http.Request
+	cancel context.CancelFunc
 }
 
 func (m *webSeed) Start() {
+	req, err := http.NewRequest("GET", m.url.url, nil)
+	if err != nil {
+		return
+	}
+	cx, cancel := context.WithCancel(context.Background())
+	m.req = req.WithContext(cx)
+	m.cancel = cancel
 	go m.Run()
 }
 
 func (m *webSeed) Run() {
-	defer func() {
-		m.Close()
-		webSeedOpen(m.t)
-	}()
-
 	info := m.t.Info()
 
 	pieceLength := info.PieceLength
@@ -257,10 +262,6 @@ func (m *webSeed) Run() {
 	offset := m.file.offset + rstart // torrent offset in bytes
 
 	if strings.HasPrefix(m.url.url, "http") {
-		req, err := http.NewRequest("GET", m.url.url, nil)
-		if err != nil {
-			return
-		}
 		// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Range
 		//
 		// Range: <unit>=<range-start>-
@@ -269,20 +270,28 @@ func (m *webSeed) Run() {
 		// Range: <unit>=<range-start>-<range-end>, <range-start>-<range-end>, <range-start>-<range-end>
 		//
 		// "Range: bytes=200-1000, 2000-6576, 19000-"
-		req.Header.Add("Range", "bytes="+strconv.FormatInt(rstart, 10)+"-"+strconv.FormatInt(rend, 10))
+		m.req.Header.Add("Range", "bytes="+strconv.FormatInt(rstart, 10)+"-"+strconv.FormatInt(rend, 10))
 		var client http.Client
-		resp, err := client.Do(req)
+		resp, err := client.Do(m.req)
 		if err != nil {
 			return
 		}
 		defer resp.Body.Close()
 		buf := make([]byte, 4*1024)
 		for n, _ := resp.Body.Read(buf); n != 0; offset += int64(n) {
+			if m.req == nil {
+				return
+			}
 			m.t.WriteChunk(offset, buf[:n])
 		}
 	}
+
+	webSeedOpen(m.t)
 }
 
 func (m *webSeed) Close() {
-	// TODO close http call
+	if m.req != nil {
+		m.cancel()
+		m.req = nil
+	}
 }
