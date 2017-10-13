@@ -2,6 +2,7 @@ package libtorrent
 
 import (
 	"context"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -54,12 +55,7 @@ func webSeedStart(t *torrent.Torrent) {
 		ws = &webSeeds{}
 		info := t.Info()
 		ws.t = t
-		ws.pieces = make([][]int64, info.NumPieces())
-		chunks := info.PieceLength / int64(t.GetChunkSize())
-		log.Println("chunks", info.NumPieces(), chunks)
-		for i := range ws.pieces {
-			ws.pieces[i] = make([]int64, chunks)
-		}
+		ws.chunks = make([][]int64, info.NumPieces())
 		ws.ww = make(map[*webSeed]bool)
 	}
 	webseedstorage[hash] = ws
@@ -73,14 +69,12 @@ func webSeedStart(t *torrent.Torrent) {
 	if ws.uu == nil {
 		ws.uu = make(map[*webUrl]bool)
 		uu := fs.UrlList
-		log.Println(t.Info().Name, len(uu), uu)
 		if len(uu) == 0 { // no webseed urls? exit
 			return
 		}
 		for _, u := range uu {
 			e := &webUrl{url: u}
 			e.Extract()
-			log.Println("extracted", e.url)
 			ws.uu[e] = true
 		}
 	}
@@ -115,7 +109,6 @@ func webSeedStart(t *torrent.Torrent) {
 	}
 
 	if len(ws.ff) == 0 {
-		log.Println("all files done")
 		return
 	}
 
@@ -145,8 +138,8 @@ func webSeedStart(t *torrent.Torrent) {
 			f.bmmin = min
 			f.bmmax = max
 		} else {
-			log.Println("file done", f.path)
 			delete(ws.ff, f)
+			//log.Println("file done", f.path, "left:", len(ws.ff))
 		}
 	}
 
@@ -168,7 +161,7 @@ func webSeedStart(t *torrent.Torrent) {
 					w := &webSeed{ws, t, u, f, f.start, f.end, nil, nil}
 					ws.ww[w] = true
 					w.Start()
-					log.Println("add webseed", f.path, w.start, w.end)
+					// log.Println("add webseed", f.path, w.start, w.end)
 					webSeedStart(t)
 					return
 				}
@@ -219,7 +212,7 @@ func webSeedStop(t *torrent.Torrent) {
 
 type webSeeds struct {
 	t      *torrent.Torrent
-	pieces [][]int64         // pieces / chunk size map
+	chunks [][]int64         // pieces / chunk size map
 	uu     map[*webUrl]bool  // source url extraceted and cleared if url broken / slow / has missing files
 	ff     map[*webFile]bool // files to download, cleard for completed files
 	ww     map[*webSeed]bool // current downloading seeds
@@ -233,43 +226,6 @@ func (m *webSeeds) UrlUseCount(u *webUrl) int {
 		}
 	}
 	return count
-}
-
-func (m *webSeeds) ChunkSize(pieceIndex int, chunkIndex int) int64 {
-	ChunkSize := int64(m.t.GetChunkSize())
-	return ChunkSize // TODO last chunk in pieace / torrent can be less then ChunkSize
-}
-
-func (m *webSeeds) WriteChunk(offset int64, buf []byte) {
-	info := m.t.Info()
-
-	pieceIndex := int(offset / info.PieceLength)
-
-	ps := offset / info.PieceLength // start piece
-
-	chunkOffset := offset - ps*info.PieceLength
-
-	bufLen := int64(len(buf))
-	ChunkSize := int64(m.t.GetChunkSize())
-
-	chunkStart := int(chunkOffset / ChunkSize)
-	chunkEnd := int((chunkOffset + bufLen) / ChunkSize)
-	chunkFull := int64(0)
-	for i := chunkStart; i < chunkEnd; i++ {
-		m.pieces[pieceIndex][i] += ChunkSize
-		chunkFull += ChunkSize
-	}
-	if chunkEnd < len(m.pieces[pieceIndex]) {
-		m.pieces[pieceIndex][chunkEnd] += bufLen - chunkFull
-	}
-
-	for i := range m.pieces[pieceIndex] {
-		if m.pieces[pieceIndex][i] >= m.ChunkSize(pieceIndex, i) {
-			m.t.UnpendChunk(pieceIndex, i) // unpend only fully downloaded chunks
-		}
-	}
-
-	m.t.WriteChunk(offset, buf)
 }
 
 type webFile struct {
@@ -366,10 +322,9 @@ func (m *webSeed) Run() {
 
 	info := m.t.Info()
 
-	pieceLength := info.PieceLength
-
 	min := m.start   // [start url piece
 	max := m.end - 1 // end] url piece
+
 	if min < m.file.bmmin {
 		min = m.file.bmmin // file min piece bigger then webSeed one
 	}
@@ -380,8 +335,9 @@ func (m *webSeed) Run() {
 	fstart := m.file.offset        // file bytes start
 	fend := fstart + m.file.length // file bytes end
 
-	pstart := int64(min) * pieceLength // piece offset bytes start
-	pend := int64(max+1) * pieceLength // piece offset bytes end
+	pstart := int64(min) * info.PieceLength // piece offset bytes start
+	pend := int64(max+1) * info.PieceLength // piece offset bytes end
+
 	if pstart < m.file.offset {
 		pstart = m.file.offset
 	}
@@ -389,8 +345,8 @@ func (m *webSeed) Run() {
 		pend = fend
 	}
 
-	rstart := pstart - fstart // RANGE offset start
-	rend := pend - fstart     // RANGE offset end
+	rmin := pstart - fstart // RANGE offset start
+	rmax := pend - fstart   // RANGE offset end
 
 	if m.url.r {
 		// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Range
@@ -401,17 +357,18 @@ func (m *webSeed) Run() {
 		// Range: <unit>=<range-start>-<range-end>, <range-start>-<range-end>, <range-start>-<range-end>
 		//
 		// "Range: bytes=200-1000, 2000-6576, 19000-"
-		m.req.Header.Add("Range", "bytes="+strconv.FormatInt(rstart, 10)+"-"+strconv.FormatInt(rend, 10))
+		m.req.Header.Add("Range", "bytes="+strconv.FormatInt(rmin, 10)+"-"+strconv.FormatInt(rmax, 10))
 	} else {
-		rstart = 0
-		rend = pend
+		rmin = 0
+		rmax = pend
 	}
 
-	offset := m.file.offset + rstart // torrent offset in bytes
+	offset := m.file.offset + rmin // torrent offset in bytes
 
 	var client http.Client
 	resp, err := client.Do(m.req)
 	if err != nil {
+		log.Println("download failed", err)
 		next = true
 		return // TODO remove 404 urls
 	}
@@ -423,24 +380,25 @@ func (m *webSeed) Run() {
 			return // return, no next
 		}
 		n, err := resp.Body.Read(buf)
-		if n == 0 && err != nil { // done
-			m.file.downloaded = m.file.downloaded + (offset - rstart)
+		if n == 0 && err == io.EOF { // done
+			m.file.downloaded += offset - rmin
 			next = true
 			return // start next webSeed
 		}
-		m.ws.WriteChunk(offset, buf[:n])
+		m.t.WriteChunk(offset, buf[:n], m.ws.chunks)
 
 		offset += int64(n)
 
 		mu.Lock()
-		k := int64(m.end) * pieceLength // update pend
+		k := int64(m.end) * info.PieceLength // update pend
 		mu.Unlock()
 
 		if k < pend {
 			pend = k // new pend less then old one?
 		}
 		if offset > pend { // reached end of webSeed.end (overriden by new webSeed)
-			m.file.downloaded = m.file.downloaded + (pend - rstart)
+			log.Println("download aborted")
+			m.file.downloaded = m.file.downloaded + (pend - rmin)
 			next = true
 			return // start next webSeed
 		}
