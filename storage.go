@@ -63,6 +63,8 @@ type fileStorage struct {
 	Creator   string
 	CreatedOn int64
 	Comment   string
+
+	UrlList metainfo.UrlList
 }
 
 func registerFileStorage(info metainfo.Hash, path string) *fileStorage {

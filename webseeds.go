@@ -38,8 +38,10 @@ func webSeedOpen(t *torrent.Torrent) {
 		return
 	}
 
+	fs := filestorage[t.InfoHash()]
+
 	if ws.uu == nil {
-		uu := t.UrlList()
+		uu := fs.UrlList
 		if len(uu) == 0 { // no webseed urls? exit
 			return
 		}
