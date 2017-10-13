@@ -23,6 +23,26 @@ const WEBSEED_BUF = 4 * 1024           // read buffer size
 
 var webseedstorage map[metainfo.Hash]*webSeeds
 
+func TorrentWebSeedsCount(i int) int {
+	mu.Lock()
+	defer mu.Unlock()
+
+	t := torrents[i]
+	fs := filestorage[t.InfoHash()]
+
+	return len(fs.UrlList)
+}
+
+func TorrentWebSeeds(i int, p int) string {
+	mu.Lock()
+	defer mu.Unlock()
+
+	t := torrents[i]
+	fs := filestorage[t.InfoHash()]
+
+	return &fs.UrlList[p]
+}
+
 // sine we can dynamically add / done webSeeds, we have add one per call
 func webSeedOpen(t *torrent.Torrent) {
 	hash := t.InfoHash()
