@@ -143,7 +143,7 @@ func webSeedStart(t *torrent.Torrent) {
 							}
 							return true
 						})
-						f := &webFile{path, offset, fi.Length, int(s), int(e), add, -1, -1, 0}
+						f := &webFile{path, offset, fi.Length, int(s), int(e), and, -1, -1, 0}
 						ws.ff[f] = true
 					}
 				}
