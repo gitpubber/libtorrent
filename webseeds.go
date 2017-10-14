@@ -185,12 +185,10 @@ func webSeedStart(t *torrent.Torrent) {
 		} else {
 			for w := range ws.ww {
 				if w.file == f {
-					log.Println("file active delete", f.path)
 					w.Close()
 				}
 			}
 			delete(ws.ff, f)
-			log.Println("file done", f.path, "left:", len(ws.ff), f.downloaded >= f.length)
 		}
 	}
 
@@ -211,9 +209,7 @@ func webSeedStart(t *torrent.Torrent) {
 				if count < WEBSEED_URL_CONCURENT {
 					w := &webSeed{ws, t, u, f, f.start, f.end, nil, nil}
 					ws.ww[w] = true
-					log.Println("add web", f.path, w.start, w.end)
 					w.Start()
-					// log.Println("add webseed", f.path, w.start, w.end)
 					webSeedStart(t)
 					return
 				}
@@ -241,7 +237,6 @@ func webSeedStart(t *torrent.Torrent) {
 							end := w1.end
 							w1.end = w1.start + piecesGrab
 							w2 := &webSeed{ws, t, u, w1.file, w1.end, end, nil, nil}
-							log.Println("split webseed", w2.file.path, w1.start, w1.end, w2.start, w2.end)
 							ws.ww[w2] = true
 							w2.Start()
 							webSeedStart(t)
@@ -380,7 +375,6 @@ func (m *webSeed) Run() {
 		m.autoClose()
 		if del {
 			delete(m.ws.uu, m.url)
-			log.Println("delete url", m.url, "left:", len(m.ws.uu))
 		}
 		if next {
 			webSeedStart(m.t)
@@ -446,7 +440,7 @@ func (m *webSeed) Run() {
 	}
 	resp, err := client.Do(m.req)
 	if err != nil {
-		log.Println("download failed", err)
+		log.Println("download error", err)
 		next = true
 		del = true
 		return
@@ -480,7 +474,6 @@ func (m *webSeed) Run() {
 		}
 
 		if offset > pend { // reached end of webSeed.end (overriden by new webSeed)
-			log.Println("download split abort", m.start, m.end)
 			m.file.downloaded += pend - offsetStart
 			next = true
 			return // start next webSeed
