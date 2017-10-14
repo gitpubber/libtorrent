@@ -12,18 +12,6 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 )
 
-func bitmapIntersects(bm *bitmap.Bitmap, s int, e int) bool { // original roaring.Intersects hidden by bitmap.Bitmap
-	fb := &bitmap.Bitmap{}
-	fb.AddRange(int(s), int(e))
-	return v(bm, fb)
-}
-
-func bitmapIntersects(bm *bitmap.Bitmap, w *bitmap.Bitmap) bool { // original roaring.Intersects hidden by bitmap.Bitmap
-	old := fb.Len()
-	fb.Sub(*w)
-	return w.Len() != old
-}
-
 type File struct {
 	Check          bool
 	Path           string

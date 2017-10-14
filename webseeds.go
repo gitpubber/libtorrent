@@ -115,7 +115,7 @@ func webSeedStart(t *torrent.Torrent) {
 		}
 		{ // add rest pices files
 			var offset int64
-			for i, fi := range info.UpvertedFiles() {
+			for _, fi := range info.UpvertedFiles() {
 				s := offset / info.PieceLength
 				e := (offset + fi.Length) / info.PieceLength
 				r := (offset + fi.Length) % info.PieceLength
@@ -135,14 +135,8 @@ func webSeedStart(t *torrent.Torrent) {
 				if !found { // if file is not selected
 					bm := &bitmap.Bitmap{}
 					bm.AddRange(int(s), int(e))
-					if bitmapIntersects(selected, bm) { // and it belong to picece selected
-						and := &bitmap.Bitmap{} // add file with range of piecec selected
-						bm.IterTyped(func(piece int) (again bool) {
-							if selected.Contains(piece) {
-								and.Add(piece)
-							}
-							return true
-						})
+					if bitmapIntersectsBm(selected, bm) { // and it belong to picece selected
+						and := bitmapAnd(bm, selected)
 						f := &webFile{path, offset, fi.Length, int(s), int(e), and, -1, -1, 0}
 						ws.ff[f] = true
 					}
