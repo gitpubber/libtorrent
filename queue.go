@@ -109,6 +109,7 @@ func queueEngine(t *torrent.Torrent) {
 				fs.DownloadingTime = fs.DownloadingTime + (now - fs.ActivateDate)
 				fs.ActivateDate = now // seeding time now
 			}
+			webSeedStop(t)
 			mu.Unlock()
 		case <-t.Wait():
 			return
