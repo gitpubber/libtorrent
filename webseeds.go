@@ -5,10 +5,12 @@ import (
 	"io"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/anacrolix/missinggo/bitmap"
 	"github.com/anacrolix/torrent"
@@ -22,6 +24,7 @@ const WEBSEED_URL_CONCURENT = 2        // how many concurent downloading per one
 const WEBSEED_CONCURENT = 4            // how many concurent downloading total
 const WEBSEED_SPLIT = 10 * 1024 * 1024 // how large split for single sizes
 const WEBSEED_BUF = 16 * 1024          // read buffer size
+const WEBSEED_TIMEOUT = time.Duration(5 * time.Second)
 
 var webseedstorage map[metainfo.Hash]*webSeeds
 
@@ -388,7 +391,17 @@ func (m *webSeed) Run() {
 	offsetStart := m.file.offset + rmin // torrent offset in bytes
 	offset := offsetStart
 
-	var client http.Client
+	var conn net.Conn
+	transport := http.Transport{
+		Dial: func(netw, addr string) (c net.Conn, err error) {
+			c, err = net.DialTimeout(netw, addr, WEBSEED_TIMEOUT)
+			conn = c
+			return c, err
+		},
+	}
+	client := http.Client{
+		Transport: &transport,
+	}
 	resp, err := client.Do(m.req)
 	if err != nil {
 		log.Println("download failed", err)
@@ -403,10 +416,14 @@ func (m *webSeed) Run() {
 		if m.req == nil { // canceled
 			return // return, no next
 		}
+		conn.SetDeadline(time.Now().Add(WEBSEED_TIMEOUT))
 		n, err := resp.Body.Read(buf)
-		if n == 0 && err == io.EOF { // done
+		if n == 0 { // done
 			m.file.downloaded += offset - offsetStart
 			next = true
+			if err != io.EOF {
+				log.Println("download error", m.start, m.end, err)
+			}
 			return // start next webSeed
 		}
 		m.t.WriteChunk(offset, buf[:n], m.ws.chunks)
