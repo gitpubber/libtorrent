@@ -23,7 +23,7 @@ import (
 const WEBSEED_URL_CONCURENT = 2        // how many concurent downloading per one Url
 const WEBSEED_CONCURENT = 4            // how many concurent downloading total
 const WEBSEED_SPLIT = 10 * 1024 * 1024 // how large split for single sizes
-const WEBSEED_BUF = 16 * 1024          // read buffer size
+const WEBSEED_BUF = 64 * 1024          // read buffer size
 const WEBSEED_TIMEOUT = time.Duration(5 * time.Second)
 
 var webseedstorage map[metainfo.Hash]*webSeeds
@@ -77,9 +77,13 @@ func webSeedStart(t *torrent.Torrent) {
 		}
 		for _, u := range uu {
 			e := &webUrl{url: u}
-			e.Extract()
 			ws.uu[e] = true
 		}
+		mu.Unlock()
+		for u := range ws.uu {
+			u.Extract()
+		}
+		mu.Lock()
 	}
 
 	torrentstorageLock.Lock() // ts block
@@ -201,7 +205,7 @@ func webSeedStart(t *torrent.Torrent) {
 			for u := range ws.uu { // choise right url, skip url if it is limited
 				count := ws.UrlUseCount(u) // how many concurent downloads per url
 				if count < WEBSEED_URL_CONCURENT {
-					w := &webSeed{ws, t, u, f, f.start, f.end, nil, nil}
+					w := &webSeed{ws, t, u, f, f.start, f.end, nil}
 					ws.ww[w] = true
 					w.Start()
 					webSeedStart(t)
@@ -230,7 +234,7 @@ func webSeedStart(t *torrent.Torrent) {
 						if w1l > piecesGrab {
 							end := w1.end
 							w1.end = w1.start + piecesGrab
-							w2 := &webSeed{ws, t, u, w1.file, w1.end, end, nil, nil}
+							w2 := &webSeed{ws, t, u, w1.file, w1.end, end, nil}
 							ws.ww[w2] = true
 							w2.Start()
 							webSeedStart(t)
@@ -250,6 +254,21 @@ func webSeedStop(t *torrent.Torrent) {
 		v.Close()
 	}
 	delete(webseedstorage, hash)
+}
+
+func DialTimeout(req *http.Request) (*http.Response, net.Conn, error) {
+	var conn net.Conn
+	transport := http.Transport{
+		Dial: func(netw, addr string) (c net.Conn, err error) {
+			conn, err = net.DialTimeout(netw, addr, WEBSEED_TIMEOUT)
+			return conn, err
+		},
+	}
+	client := http.Client{
+		Transport: &transport,
+	}
+	resp, err := client.Do(req)
+	return resp, conn, err
 }
 
 type webSeeds struct {
@@ -299,8 +318,7 @@ func (m *webUrl) Extract() {
 			return
 		}
 		req.Header.Add("Range", "bytes=0-0")
-		var client http.Client
-		resp, err := client.Do(req)
+		resp, _, err := DialTimeout(req)
 		if err != nil {
 			return
 		}
@@ -331,7 +349,6 @@ type webSeed struct {
 	start int      // start piece number (can be bigger then file.start)
 	end   int      // end piece number (can be lower then file.end)
 
-	req    *http.Request
 	cancel context.CancelFunc
 }
 
@@ -354,12 +371,12 @@ func (m *webSeed) Start() {
 	}
 
 	cx, cancel := context.WithCancel(context.Background())
-	m.req = req.WithContext(cx)
+	req = req.WithContext(cx)
 	m.cancel = cancel
-	go m.Run()
+	go m.Run(req)
 }
 
-func (m *webSeed) Run() {
+func (m *webSeed) Run(req *http.Request) {
 	next := false
 	del := false
 
@@ -412,7 +429,7 @@ func (m *webSeed) Run() {
 		// Range: <unit>=<range-start>-<range-end>, <range-start>-<range-end>, <range-start>-<range-end>
 		//
 		// "Range: bytes=200-1000, 2000-6576, 19000-"
-		m.req.Header.Add("Range", "bytes="+strconv.FormatInt(rmin, 10)+"-"+strconv.FormatInt(rmax, 10))
+		req.Header.Add("Range", "bytes="+strconv.FormatInt(rmin, 10)+"-"+strconv.FormatInt(rmax, 10))
 	} else {
 		rmin = 0
 		rmax = pend
@@ -421,18 +438,7 @@ func (m *webSeed) Run() {
 	offsetStart := m.file.offset + rmin // torrent offset in bytes
 	offset := offsetStart
 
-	var conn net.Conn
-	transport := http.Transport{
-		Dial: func(netw, addr string) (c net.Conn, err error) {
-			c, err = net.DialTimeout(netw, addr, WEBSEED_TIMEOUT)
-			conn = c
-			return c, err
-		},
-	}
-	client := http.Client{
-		Transport: &transport,
-	}
-	resp, err := client.Do(m.req)
+	resp, conn, err := DialTimeout(req)
 	if err != nil {
 		log.Println("download error", err)
 		next = true
@@ -443,7 +449,7 @@ func (m *webSeed) Run() {
 
 	buf := make([]byte, WEBSEED_BUF)
 	for true {
-		if m.req == nil { // canceled
+		if m.cancel == nil { // canceled
 			return // return, no next
 		}
 		conn.SetDeadline(time.Now().Add(WEBSEED_TIMEOUT))
@@ -480,9 +486,9 @@ func (m *webSeed) autoClose() {
 }
 
 func (m *webSeed) Close() {
-	if m.req != nil {
+	if m.cancel != nil {
 		m.cancel()
-		m.req = nil
+		m.cancel = nil
 	}
 	m.autoClose()
 }
