@@ -21,7 +21,7 @@ import (
 const WEBSEED_URL_CONCURENT = 2        // how many concurent downloading per one Url
 const WEBSEED_CONCURENT = 4            // how many concurent downloading total
 const WEBSEED_SPLIT = 10 * 1024 * 1024 // how large split for single sizes
-const WEBSEED_BUF = 4 * 1024           // read buffer size
+const WEBSEED_BUF = 16 * 1024          // read buffer size
 
 var webseedstorage map[metainfo.Hash]*webSeeds
 
@@ -119,7 +119,7 @@ func webSeedStart(t *torrent.Torrent) {
 		max := -1            // last piece to download
 		if f.downloaded < f.length {
 			f.bm.IterTyped(func(piece int) (again bool) {
-				if t.PieceBytesCompleted(piece) == t.PieceLength(piece) {
+				if ts.completedPieces.Get(piece) {
 					completed.Add(piece)
 				} else {
 					done = false // one of the piece not complete
@@ -138,8 +138,14 @@ func webSeedStart(t *torrent.Torrent) {
 			f.bmmin = min
 			f.bmmax = max
 		} else {
+			for w := range ws.ww {
+				if w.file == f {
+					log.Println("file active delete", f.path)
+					w.Close()
+				}
+			}
 			delete(ws.ff, f)
-			//log.Println("file done", f.path, "left:", len(ws.ff))
+			log.Println("file done", f.path, "left:", len(ws.ff), f.downloaded >= f.length)
 		}
 	}
 
@@ -160,6 +166,7 @@ func webSeedStart(t *torrent.Torrent) {
 				if count < WEBSEED_URL_CONCURENT {
 					w := &webSeed{ws, t, u, f, f.start, f.end, nil, nil}
 					ws.ww[w] = true
+					log.Println("add web", f.path, w.start, w.end)
 					w.Start()
 					// log.Println("add webseed", f.path, w.start, w.end)
 					webSeedStart(t)
@@ -170,30 +177,31 @@ func webSeedStart(t *torrent.Torrent) {
 		}
 	}
 
-	return
-
 	// all files downloading in the array, find first and split it
-	for w := range ws.ww {
-		l := w.file.bmmax + 1 - w.file.bmmin // pieces length
-		ld := int64(l) / 2 * pieceLength     // download size divide by 2
-		if ld > WEBSEED_SPLIT {
-			for u := range ws.uu { // choise right url, skip url if it is limited
-				if u.r {
-					count := ws.UrlUseCount(u) // how many concurent downloads per url
-					if count < WEBSEED_URL_CONCURENT {
-						parts := WEBSEED_CONCURENT
-						piecesCount := l / parts // pieces count
-						for int64(piecesCount)*pieceLength < WEBSEED_SPLIT {
-							parts--
-							piecesCount = l / parts
+	for w1 := range ws.ww {
+		for u := range ws.uu { // choise right url, skip url if it is limited
+			if u.r {
+				count := ws.UrlUseCount(u) // how many concurent downloads per url
+				if count < WEBSEED_URL_CONCURENT {
+					fileParts := w1.file.bmmax - w1.file.bmmin + 1 // how many undownloaded pieces in a file
+					splitCount := WEBSEED_CONCURENT
+					piecesGrab := fileParts / splitCount // how many pieces to grab per webSeed
+					for int64(piecesGrab)*pieceLength < WEBSEED_SPLIT && splitCount > 1 {
+						splitCount-- // webSeed smaller then WEBSEED_SPLIT, increase side by reducing splits
+						piecesGrab = fileParts / splitCount
+					}
+					if splitCount > 1 { // abble to split?
+						w1l := w1.end - w1.start // w pices to download
+						if w1l > piecesGrab {
+							end := w1.end
+							w1.end = w1.start + piecesGrab
+							w2 := &webSeed{ws, t, u, w1.file, w1.end, end, nil, nil}
+							log.Println("split webseed", w2.file.path, w1.start, w1.end, w2.start, w2.end)
+							ws.ww[w2] = true
+							w2.Start()
+							webSeedStart(t)
+							return
 						}
-						w.end = w.file.bmmin + piecesCount
-						w2 := &webSeed{ws, t, u, w.file, w.end, w.end + piecesCount, nil, nil}
-						log.Println("split webseed", w.file.path, w.start, w.end)
-						ws.ww[w2] = true
-						w2.Start()
-						webSeedStart(t)
-						return
 					}
 				}
 			}
@@ -298,7 +306,15 @@ func (m *webSeed) Start() {
 		return
 	}
 
-	req, err := http.NewRequest("GET", m.url.url+"/"+m.file.path, nil)
+	var url string
+
+	if len(m.ws.ff) > 1 {
+		url = m.url.url + "/" + m.file.path
+	} else {
+		url = m.url.url
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return
 	}
@@ -311,10 +327,16 @@ func (m *webSeed) Start() {
 
 func (m *webSeed) Run() {
 	next := false
+	del := false
+
 	defer func() {
 		mu.Lock()
 		defer mu.Unlock()
 		m.autoClose()
+		if del {
+			delete(m.ws.uu, m.url)
+			log.Println("delete url", m.url, "left:", len(m.ws.uu))
+		}
 		if next {
 			webSeedStart(m.t)
 		}
@@ -363,14 +385,16 @@ func (m *webSeed) Run() {
 		rmax = pend
 	}
 
-	offset := m.file.offset + rmin // torrent offset in bytes
+	offsetStart := m.file.offset + rmin // torrent offset in bytes
+	offset := offsetStart
 
 	var client http.Client
 	resp, err := client.Do(m.req)
 	if err != nil {
 		log.Println("download failed", err)
 		next = true
-		return // TODO remove 404 urls
+		del = true
+		return
 	}
 	defer resp.Body.Close()
 
@@ -381,7 +405,7 @@ func (m *webSeed) Run() {
 		}
 		n, err := resp.Body.Read(buf)
 		if n == 0 && err == io.EOF { // done
-			m.file.downloaded += offset - rmin
+			m.file.downloaded += offset - offsetStart
 			next = true
 			return // start next webSeed
 		}
@@ -392,13 +416,13 @@ func (m *webSeed) Run() {
 		mu.Lock()
 		k := int64(m.end) * info.PieceLength // update pend
 		mu.Unlock()
-
 		if k < pend {
 			pend = k // new pend less then old one?
 		}
+
 		if offset > pend { // reached end of webSeed.end (overriden by new webSeed)
-			log.Println("download aborted")
-			m.file.downloaded = m.file.downloaded + (pend - rmin)
+			log.Println("download split abort", m.start, m.end)
+			m.file.downloaded += pend - offsetStart
 			next = true
 			return // start next webSeed
 		}
