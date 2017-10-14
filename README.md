@@ -38,6 +38,7 @@ Additional features:
   * Runtime torrent states (save state between restarts)
   * BEPs
     - 14: Local Peers Discovery
+    - 19: WebSeeds
   * Queue Engine (active/queued torrent list)
   * Full Contorl over torrent state (download metadata, download data, stop, pause, resume)
 
