@@ -2,6 +2,7 @@ package libtorrent
 
 import (
 	"bytes"
+	"errors"
 	"math/rand"
 	"net"
 	"net/http"
@@ -139,7 +140,14 @@ func PortCheck() (bool, error) {
 	buf.ReadFrom(resp.Body)
 	s := buf.String()
 
-	return s == "1", nil
+	if s == "1" {
+		return true, nil
+	}
+	if s == "0" {
+		return false, nil
+	}
+
+	return false, errors.New("unable to get resposne")
 }
 
 func getPort(d nat.Device, proto nat.Protocol, port int, extPort string) (int, error) {

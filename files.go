@@ -368,14 +368,6 @@ func TorrentFileDeleteUnselected(i int) {
 	fileUpdateCheck(t)
 }
 
-func bitmapIntersects(bm *bitmap.Bitmap, s int, e int) bool { // original roaring.Intersects hidden by bitmap.Bitmap
-	fb := &bitmap.Bitmap{}
-	fb.AddRange(int(s), int(e))
-	old := fb.Len()
-	fb.Sub(*bm)
-	return fb.Len() != old
-}
-
 func torrentFileDeleteUnselected(t *torrent.Torrent) error {
 	hash := t.InfoHash()
 

@@ -103,6 +103,7 @@ func Create() bool {
 	torrentstorage = make(map[metainfo.Hash]*torrentStorage)
 	queue = make(map[*torrent.Torrent]int64)
 	active = make(map[*torrent.Torrent]int64)
+	webseedstorage = make(map[metainfo.Hash]*webSeeds)
 	pause = nil
 	index = 0
 	tcpPort = ""
@@ -266,6 +267,7 @@ func AddTorrentFromURL(path string, url string) int {
 	fs.Comment = mi.Comment
 	fs.Creator = mi.CreatedBy
 	fs.CreatedOn = (time.Duration(mi.CreationDate) * time.Second).Nanoseconds()
+	fs.UrlList = mi.UrlList
 
 	t, err = client.AddTorrent(mi)
 	if err != nil {
@@ -306,6 +308,7 @@ func AddTorrent(file string) int {
 	fs.Comment = mi.Comment
 	fs.Creator = mi.CreatedBy
 	fs.CreatedOn = (time.Duration(mi.CreationDate) * time.Second).Nanoseconds()
+	fs.UrlList = mi.UrlList
 
 	t, err = client.AddTorrent(mi)
 	if err != nil {
@@ -344,6 +347,7 @@ func AddTorrentFromBytes(path string, buf []byte) int {
 	fs.Comment = mi.Comment
 	fs.Creator = mi.CreatedBy
 	fs.CreatedOn = (time.Duration(mi.CreationDate) * time.Second).Nanoseconds()
+	fs.UrlList = mi.UrlList
 
 	t, err = client.AddTorrent(mi)
 	if err != nil {
@@ -432,7 +436,12 @@ func startTorrent(t *torrent.Torrent) bool {
 		defer mu.Unlock()
 
 		now := time.Now().UnixNano()
-		fs.DownloadingTime = fs.DownloadingTime + (now - fs.ActivateDate)
+		if pendingCompleted(t) { // seeding
+			fs.SeedingTime = fs.SeedingTime + (now - fs.ActivateDate)
+		} else { // downloading
+			fs.DownloadingTime = fs.DownloadingTime + (now - fs.ActivateDate)
+			webSeedStart(t)
+		}
 		fs.ActivateDate = now
 
 		fileUpdateCheck(t)
@@ -530,6 +539,7 @@ func stopTorrent(t *torrent.Torrent) bool {
 		}
 		fs.ActivateDate = now
 		delete(active, t)
+		webSeedStop(t)
 		return true
 	} else {
 		t.Stop()

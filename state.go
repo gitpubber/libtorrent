@@ -85,11 +85,13 @@ type TorrentState struct {
 	Comment   string `json:"comment,omitempty"`
 	Creator   string `json:"creator,omitempty"`
 	CreatedOn int64  `json:"created_on,omitempty"`
+
+	UrlList metainfo.UrlList `bencode:"url-list,omitempty"`
 }
 
 // Save torrent to state file
 func saveTorrentState(t *torrent.Torrent) ([]byte, error) {
-	s := TorrentState{Version: 3}
+	s := TorrentState{Version: 4}
 
 	hash := t.InfoHash()
 
@@ -133,6 +135,8 @@ func saveTorrentState(t *torrent.Torrent) ([]byte, error) {
 	s.Creator = fs.Creator
 	s.CreatedOn = fs.CreatedOn
 
+	s.UrlList = fs.UrlList
+
 	if t.Info() != nil {
 		torrentstorageLock.Lock()
 		ts := torrentstorage[t.InfoHash()]
@@ -159,6 +163,7 @@ func loadTorrentState(path string, buf []byte) (t *torrent.Torrent, err error) {
 		version2to3(&s)
 	case 2:
 		version2to3(&s)
+	case 3: // 3to4 - new field UrlList
 	}
 
 	var spec *torrent.TorrentSpec
@@ -223,6 +228,8 @@ func loadTorrentState(path string, buf []byte) (t *torrent.Torrent, err error) {
 	fs.Comment = s.Comment
 	fs.Creator = s.Creator
 	fs.CreatedOn = s.CreatedOn
+
+	fs.UrlList = s.UrlList
 
 	return
 }

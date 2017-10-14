@@ -63,6 +63,8 @@ type fileStorage struct {
 	Creator   string
 	CreatedOn int64
 	Comment   string
+
+	UrlList metainfo.UrlList
 }
 
 func registerFileStorage(info metainfo.Hash, path string) *fileStorage {
@@ -74,7 +76,6 @@ func registerFileStorage(info metainfo.Hash, path string) *fileStorage {
 
 	fs := &fileStorage{
 		AddedDate: time.Now().UnixNano(),
-
 		Comment:   "dynamic metainfo from client",
 		Creator:   "go.libtorrent",
 		CreatedOn: time.Now().UnixNano(),
@@ -138,10 +139,6 @@ func (m *torrentOpener) Close() error {
 	return nil
 }
 
-type fileTorrentStorage struct {
-	ts *torrentStorage
-}
-
 func (m *torrentOpener) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash) (storage.TorrentImpl, error) {
 	torrentstorageLock.Lock()
 	defer torrentstorageLock.Unlock()
@@ -160,6 +157,10 @@ func (m *torrentOpener) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash)
 	ts.Completed() // update comleted after torrent open
 
 	return &fileTorrentStorage{ts}, nil
+}
+
+type fileTorrentStorage struct {
+	ts *torrentStorage
 }
 
 func (m *fileTorrentStorage) Piece(p metainfo.Piece) storage.PieceImpl {
