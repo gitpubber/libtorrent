@@ -347,6 +347,7 @@ func AddTorrentFromBytes(path string, buf []byte) int {
 	fs.Comment = mi.Comment
 	fs.Creator = mi.CreatedBy
 	fs.CreatedOn = (time.Duration(mi.CreationDate) * time.Second).Nanoseconds()
+	fs.UrlList = mi.UrlList
 
 	t, err = client.AddTorrent(mi)
 	if err != nil {
@@ -438,9 +439,8 @@ func startTorrent(t *torrent.Torrent) bool {
 		fs.DownloadingTime = fs.DownloadingTime + (now - fs.ActivateDate)
 		fs.ActivateDate = now
 
-		webSeedStart(t)
-
 		fileUpdateCheck(t)
+		webSeedStart(t)
 	}()
 
 	go func() {
