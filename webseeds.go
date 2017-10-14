@@ -249,11 +249,12 @@ func webSeedStart(t *torrent.Torrent) {
 
 func webSeedStop(t *torrent.Torrent) {
 	hash := t.InfoHash()
-	ww := webseedstorage[hash]
-	for v := range ww.ww {
-		v.Close()
+	if ww, ok := webseedstorage[hash]; ok {
+		for v := range ww.ww {
+			v.Close()
+		}
+		delete(webseedstorage, hash)
 	}
-	delete(webseedstorage, hash)
 }
 
 func DialTimeout(req *http.Request) (*http.Response, net.Conn, error) {
