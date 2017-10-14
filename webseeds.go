@@ -92,22 +92,64 @@ func webSeedStart(t *torrent.Torrent) {
 
 	if ws.ff == nil {
 		ws.ff = make(map[*webFile]bool)
-		var offset int64
-		for i, fi := range info.UpvertedFiles() {
-			s := offset / info.PieceLength
-			e := (offset + fi.Length) / info.PieceLength
-			r := (offset + fi.Length) % info.PieceLength
-			if r > 0 {
-				e++
+		selected := &bitmap.Bitmap{}
+		{ // add user selected files
+			var offset int64
+			for i, fi := range info.UpvertedFiles() {
+				s := offset / info.PieceLength
+				e := (offset + fi.Length) / info.PieceLength
+				r := (offset + fi.Length) % info.PieceLength
+				if r > 0 {
+					e++
+				}
+				if checks[i] {
+					selected.AddRange(int(s), int(e))
+					bm := &bitmap.Bitmap{}
+					bm.AddRange(int(s), int(e))
+					path := strings.Join(append([]string{ts.info.Name}, fi.Path...), "/") // keep original torrent name unrenamed
+					f := &webFile{path, offset, fi.Length, int(s), int(e), bm, -1, -1, 0} // [s, e)
+					ws.ff[f] = true
+				}
+				offset += fi.Length
 			}
-			if checks[i] {
-				bm := &bitmap.Bitmap{}
-				bm.AddRange(int(s), int(e))
+		}
+		{ // add rest pices files
+			var offset int64
+			for i, fi := range info.UpvertedFiles() {
+				s := offset / info.PieceLength
+				e := (offset + fi.Length) / info.PieceLength
+				r := (offset + fi.Length) % info.PieceLength
+				if r > 0 {
+					e++
+				}
+
 				path := strings.Join(append([]string{ts.info.Name}, fi.Path...), "/") // keep original torrent name unrenamed
-				f := &webFile{path, offset, fi.Length, int(s), int(e), bm, -1, -1, 0} // [s, e)
-				ws.ff[f] = true
+
+				found := false
+				for f := range ws.ff {
+					if f.path == path {
+						found = true
+					}
+				}
+
+				if !found { // if file is not selected
+					bm := &bitmap.Bitmap{}
+					bm.AddRange(int(s), int(e))
+					if bitmapIntersects(selected, bm) { // and it belong to picece selected
+						and := &bitmap.Bitmap{} // add file with range of piecec selected
+						bm.IterTyped(func(piece int) (again bool) {
+							if selected.Contains(piece) {
+								and.Add(piece)
+							}
+							return true
+						})
+						f := &webFile{path, offset, fi.Length, int(s), int(e), add, -1, -1, 0}
+						ws.ff[f] = true
+					}
+				}
+
+				offset += fi.Length
 			}
-			offset += fi.Length
 		}
 	}
 
