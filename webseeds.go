@@ -80,12 +80,12 @@ func webSeedStart(t *torrent.Torrent) {
 
 	if ws.uu == nil {
 		ws.uu = make(map[*webUrl]bool)
-		uu := fs.UrlList
-		if len(uu) == 0 { // no webseed urls? exit
+		if len(fs.UrlList) == 0 { // no webseed urls? exit
 			return
 		}
-		for i := range uu {
-			u := &uu[i]
+		for i := range fs.UrlList {
+			u := &fs.UrlList[i]
+			u.Error = "" // clear error on restarts
 			e := &webUrl{url: u.Url, ws: u}
 			ws.uu[e] = true
 		}
