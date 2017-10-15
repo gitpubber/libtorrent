@@ -80,12 +80,12 @@ func webSeedStart(t *torrent.Torrent) {
 
 	if ws.uu == nil {
 		ws.uu = make(map[*webUrl]bool)
-		uu := fs.UrlList
-		if len(uu) == 0 { // no webseed urls? exit
+		if len(fs.UrlList) == 0 { // no webseed urls? exit
 			return
 		}
-		for i := range uu {
-			u := &uu[i]
+		for i := range fs.UrlList {
+			u := &fs.UrlList[i]
+			u.Error = "" // clear error on restarts
 			e := &webUrl{url: u.Url, ws: u}
 			ws.uu[e] = true
 		}
@@ -527,13 +527,5 @@ func (m *webSeeds) UrlUseCount(u *webUrl) int {
 
 func (m webSeeds) DeleteUrl(u *webUrl, err error) {
 	delete(m.uu, u)
-
-	hash := m.t.InfoHash()
-	fs := filestorage[hash]
-
-	for _, wu := range fs.UrlList {
-		if wu.Url == u.url {
-			wu.Error = err.Error()
-		}
-	}
+	u.ws.Error = err.Error()
 }
