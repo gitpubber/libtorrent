@@ -2,6 +2,7 @@ package libtorrent
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"math"
@@ -30,7 +31,8 @@ var webseedstorage map[metainfo.Hash]*webSeeds
 
 type WebSeed struct {
 	Url        string
-	Downloaded int64
+	Downloaded int64  // total bytes / speed test
+	Error      string // error if url were removed
 }
 
 func TorrentWebSeedsCount(i int) int {
@@ -90,7 +92,7 @@ func webSeedStart(t *torrent.Torrent) {
 		for u := range ws.uu {
 			err := u.Extract()
 			if err != nil {
-				delete(ws.uu, u)
+				ws.DeleteUrl(u, err)
 			}
 		}
 		mu.Lock()
@@ -259,8 +261,8 @@ func webSeedStart(t *torrent.Torrent) {
 
 func webSeedStop(t *torrent.Torrent) {
 	hash := t.InfoHash()
-	if ww, ok := webseedstorage[hash]; ok {
-		for v := range ww.ww {
+	if ws, ok := webseedstorage[hash]; ok {
+		for v := range ws.ww {
 			v.Close()
 		}
 		delete(webseedstorage, hash)
@@ -282,22 +284,18 @@ func DialTimeout(req *http.Request) (*http.Response, net.Conn, error) {
 	return resp, conn, err
 }
 
-type webSeeds struct {
-	t      *torrent.Torrent
-	chunks [][]int64         // pieces / chunk size map
-	uu     map[*webUrl]bool  // source url extraceted and cleared if url broken / slow / has missing files
-	ff     map[*webFile]bool // files to download, cleard for completed files
-	ww     map[*webSeed]bool // current downloading seeds
+func formatWebSeed(w *webSeed) string {
+	str := ""
+	str += fmt.Sprintf("[%d,%d] ", w.start, w.end)
+	return str
 }
 
-func (m *webSeeds) UrlUseCount(u *webUrl) int {
-	count := 0
-	for w := range m.ww {
-		if w.url == u {
-			count = count + 1
-		}
+func formatWebSeeds(ws *webSeeds) string {
+	str := ""
+	for w := range ws.ww {
+		str += formatWebSeed(w)
 	}
-	return count
+	return str
 }
 
 type webFile struct {
@@ -319,7 +317,6 @@ type webUrl struct {
 	url        string // source url
 	r          bool   // http RANGE support?
 	length     int64  // file url size (content-size)
-	count      int    // how many requests (load balancing)
 	downloaded int64  // statistics downloaded
 }
 
@@ -392,14 +389,14 @@ func (m *webSeed) Start() {
 
 func (m *webSeed) Run(req *http.Request) {
 	next := false
-	del := false
+	var del error
 
 	defer func() {
 		mu.Lock()
 		defer mu.Unlock()
 		m.autoClose()
-		if del {
-			delete(m.ws.uu, m.url)
+		if del != nil {
+			m.ws.DeleteUrl(m.url, del)
 		}
 		if next {
 			webSeedStart(m.t)
@@ -456,7 +453,7 @@ func (m *webSeed) Run(req *http.Request) {
 	if err != nil {
 		log.Println("download error", err)
 		next = true
-		del = true
+		del = err
 		return
 	}
 	defer resp.Body.Close()
@@ -507,4 +504,35 @@ func (m *webSeed) Close() {
 		m.cancel = nil
 	}
 	m.autoClose()
+}
+
+type webSeeds struct {
+	t      *torrent.Torrent
+	chunks [][]int64         // pieces / chunk size map
+	uu     map[*webUrl]bool  // source url extraceted and cleared if url broken / slow / has missing files
+	ff     map[*webFile]bool // files to download, cleard for completed files
+	ww     map[*webSeed]bool // current downloading seeds
+}
+
+func (m *webSeeds) UrlUseCount(u *webUrl) int {
+	count := 0
+	for w := range m.ww {
+		if w.url == u {
+			count = count + 1
+		}
+	}
+	return count
+}
+
+func (m webSeeds) DeleteUrl(u *webUrl, err error) {
+	delete(m.uu, u)
+
+	hash := m.t.InfoHash()
+	fs := filestorage[hash]
+
+	for _, wu := range fs.UrlList {
+		if wu.Url == u.url {
+			wu.Error = err.Error()
+		}
+	}
 }

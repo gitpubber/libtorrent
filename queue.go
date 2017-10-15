@@ -121,33 +121,29 @@ func queueEngine(t *torrent.Torrent) {
 			return // we sholuld not call queueNext on suspend torrent, otherwise it overlap ActiveTorrent
 		}
 		if pendingCompleted(t) { // seeding
-			if queueNext(t) {
-				// we been removed, stop queue engine
+			if queueNext(t) { // we been removed, stop queue engine
 				mu.Unlock()
 				return
-			} else {
-				// we not been removed
+			} else { // we not been removed
 				if len(queue) != 0 {
 					// queue full, some one soon be available, check every minute
 					timeout = 1 * time.Minute
 				}
 			}
 		} else { // downloading
-			// check stalled, and rotate if it does
 			b2 := t.BytesCompleted()
-			if b1 == b2 {
-				if queueNext(t) {
-					// we been removed, stop queue engine
+			if b1 == b2 { // check stalled, and rotate if it does
+				if queueNext(t) { // we been removed, stop queue engine
 					mu.Unlock()
 					return
-				} else {
-					// we not been removed
+				} else { // we not been removed
 					if len(queue) != 0 {
 						// queue full, some one soon be available, check every minute
 						timeout = 1 * time.Minute
 					}
 				}
 			}
+			webSeedStart(t)
 		}
 		mu.Unlock()
 	}

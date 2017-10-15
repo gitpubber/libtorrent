@@ -232,7 +232,7 @@ func loadTorrentState(path string, buf []byte) (t *torrent.Torrent, err error) {
 	fs.CreatedOn = s.CreatedOn
 
 	for _, u := range s.UrlList {
-		fs.UrlList = append(fs.UrlList, WebSeed{u, 0})
+		fs.UrlList = append(fs.UrlList, WebSeed{Url: u})
 	}
 
 	return
