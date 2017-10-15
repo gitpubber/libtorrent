@@ -527,13 +527,5 @@ func (m *webSeeds) UrlUseCount(u *webUrl) int {
 
 func (m webSeeds) DeleteUrl(u *webUrl, err error) {
 	delete(m.uu, u)
-
-	hash := m.t.InfoHash()
-	fs := filestorage[hash]
-
-	for _, wu := range fs.UrlList {
-		if wu.Url == u.url {
-			wu.Error = err.Error()
-		}
-	}
+	u.ws.Error = err.Error()
 }
