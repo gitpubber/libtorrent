@@ -143,7 +143,6 @@ func queueEngine(t *torrent.Torrent) {
 					}
 				}
 			}
-			webSeedStart(t)
 		}
 		mu.Unlock()
 	}

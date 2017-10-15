@@ -447,7 +447,6 @@ func startTorrent(t *torrent.Torrent) bool {
 			fs.SeedingTime = fs.SeedingTime + (now - fs.ActivateDate)
 		} else { // downloading
 			fs.DownloadingTime = fs.DownloadingTime + (now - fs.ActivateDate)
-			webSeedStart(t)
 		}
 		fs.ActivateDate = now
 

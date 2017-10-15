@@ -277,7 +277,9 @@ func fileUpdateCheck(t *torrent.Torrent) {
 			fs.ActivateDate = now
 		}
 
-		webSeedStart(t)
+		if _, ok := active[t]; ok {
+			webSeedStart(t)
+		}
 	} else { // now we seeding
 		// did we download before? update downloading timer then
 		if downloading {
