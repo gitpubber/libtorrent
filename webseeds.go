@@ -29,9 +29,8 @@ const WEBSEED_TIMEOUT = time.Duration(5 * time.Second) // dial up and socket rea
 var webseedstorage map[metainfo.Hash]*webSeeds
 
 type WebSeed struct {
-	Url         string
-	Downloaded  int64
-	Downloading int64
+	Url        string
+	Downloaded int64
 }
 
 func TorrentWebSeedsCount(i int) int {
@@ -58,12 +57,12 @@ func TorrentWebSeeds(i int, p int) WebSeed {
 	if ws, ok := webseedstorage[hash]; ok {
 		for u := range ws.uu {
 			if u.url == url {
-				return WebSeed{url, u.downloaded, u.downloading}
+				return WebSeed{url, u.downloaded}
 			}
 		}
 	}
 
-	return WebSeed{url, 0, 0}
+	return WebSeed{url, 0}
 }
 
 // sine we can dynamically add / done webSeeds, we have add one per call
@@ -327,12 +326,11 @@ var CONTENT_RANGE = regexp.MustCompile("bytes (\\d+)-(\\d+)/(\\d+)")
 
 // web url, keep url information (resume support? mulitple connections?)
 type webUrl struct {
-	url         string // source url
-	r           bool   // http RANGE support?
-	length      int64  // file url size (content-size)
-	count       int    // how many requests (load balancing)
-	downloaded  int64  // statistics downloaded
-	downloading int64  // statistics downloading
+	url        string // source url
+	r          bool   // http RANGE support?
+	length     int64  // file url size (content-size)
+	count      int    // how many requests (load balancing)
+	downloaded int64  // statistics downloaded
 }
 
 func (m *webUrl) Extract() error {
@@ -490,8 +488,7 @@ func (m *webSeed) Run(req *http.Request) {
 		}
 		m.t.WriteChunk(offset, buf[:n], m.ws.chunks)
 
-		m.url.downloaded += n
-		m.url.downloading += n
+		m.url.downloaded += int64(n)
 
 		offset += int64(n)
 
