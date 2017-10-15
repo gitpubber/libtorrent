@@ -44,7 +44,7 @@ func TorrentWebSeedsCount(i int) int {
 	return len(fs.UrlList)
 }
 
-func TorrentWebSeeds(i int, p int) WebSeed {
+func TorrentWebSeeds(i int, p int) *WebSeed {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -52,17 +52,7 @@ func TorrentWebSeeds(i int, p int) WebSeed {
 	hash := t.InfoHash()
 	fs := filestorage[hash]
 
-	url := fs.UrlList[p]
-
-	if ws, ok := webseedstorage[hash]; ok {
-		for u := range ws.uu {
-			if u.url == url {
-				return WebSeed{url, u.downloaded}
-			}
-		}
-	}
-
-	return WebSeed{url, 0}
+	return &fs.UrlList[p]
 }
 
 // sine we can dynamically add / done webSeeds, we have add one per call
@@ -93,7 +83,7 @@ func webSeedStart(t *torrent.Torrent) {
 			return
 		}
 		for _, u := range uu {
-			e := &webUrl{url: u}
+			e := &webUrl{url: u.Url}
 			ws.uu[e] = true
 		}
 		mu.Unlock()
