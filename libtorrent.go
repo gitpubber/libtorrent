@@ -534,6 +534,8 @@ func stopTorrent(t *torrent.Torrent) bool {
 
 	fs := filestorage[t.InfoHash()]
 
+	webSeedStop(t)
+
 	if _, ok := active[t]; ok {
 		s := t.Seeding()
 		t.Drop()
@@ -545,7 +547,6 @@ func stopTorrent(t *torrent.Torrent) bool {
 		}
 		fs.ActivateDate = now
 		delete(active, t)
-		webSeedStop(t)
 		return true
 	} else {
 		t.Stop()
