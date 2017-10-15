@@ -20,32 +20,50 @@ import (
 // http://bittorrent.org/beps/bep_0017.html - httpseeds
 // http://bittorrent.org/beps/bep_0019.html - url-list
 
-const WEBSEED_URL_CONCURENT = 2        // how many concurent downloading per one Url
-const WEBSEED_CONCURENT = 4            // how many concurent downloading total
-const WEBSEED_SPLIT = 10 * 1024 * 1024 // how large split for single sizes
-const WEBSEED_BUF = 64 * 1024          // read buffer size
-const WEBSEED_TIMEOUT = time.Duration(5 * time.Second)
+const WEBSEED_URL_CONCURENT = 2                        // how many concurent downloading per one Url
+const WEBSEED_CONCURENT = 4                            // how many concurent downloading total
+const WEBSEED_SPLIT = 10 * 1024 * 1024                 // how large split for single sizes
+const WEBSEED_BUF = 64 * 1024                          // read buffer size
+const WEBSEED_TIMEOUT = time.Duration(5 * time.Second) // dial up and socket read timeouts
 
 var webseedstorage map[metainfo.Hash]*webSeeds
+
+type WebSeed struct {
+	Url         string
+	Downloaded  int64
+	Downloading int64
+}
 
 func TorrentWebSeedsCount(i int) int {
 	mu.Lock()
 	defer mu.Unlock()
 
 	t := torrents[i]
-	fs := filestorage[t.InfoHash()]
+	hash := t.InfoHash()
+	fs := filestorage[hash]
 
 	return len(fs.UrlList)
 }
 
-func TorrentWebSeeds(i int, p int) string {
+func TorrentWebSeeds(i int, p int) WebSeed {
 	mu.Lock()
 	defer mu.Unlock()
 
 	t := torrents[i]
-	fs := filestorage[t.InfoHash()]
+	hash := t.InfoHash()
+	fs := filestorage[hash]
 
-	return fs.UrlList[p]
+	url := fs.UrlList[p]
+
+	if ws, ok := webseedstorage[hash]; ok {
+		for u := range ws.uu {
+			if u.url == url {
+				return WebSeed{url, u.downloaded, u.downloading}
+			}
+		}
+	}
+
+	return WebSeed{url, 0, 0}
 }
 
 // sine we can dynamically add / done webSeeds, we have add one per call
@@ -81,7 +99,10 @@ func webSeedStart(t *torrent.Torrent) {
 		}
 		mu.Unlock()
 		for u := range ws.uu {
-			u.Extract()
+			err := u.Extract()
+			if err != nil {
+				delete(ws.uu, u)
+			}
 		}
 		mu.Lock()
 	}
@@ -306,26 +327,28 @@ var CONTENT_RANGE = regexp.MustCompile("bytes (\\d+)-(\\d+)/(\\d+)")
 
 // web url, keep url information (resume support? mulitple connections?)
 type webUrl struct {
-	url    string // source url
-	r      bool   // http RANGE support?
-	length int64  // file url size (content-size)
-	count  int    // how many requests (load balancing)
+	url         string // source url
+	r           bool   // http RANGE support?
+	length      int64  // file url size (content-size)
+	count       int    // how many requests (load balancing)
+	downloaded  int64  // statistics downloaded
+	downloading int64  // statistics downloading
 }
 
-func (m *webUrl) Extract() {
+func (m *webUrl) Extract() error {
 	if strings.HasPrefix(m.url, "http") {
 		req, err := http.NewRequest("GET", m.url, nil)
 		if err != nil {
-			return
+			return err
 		}
 		req.Header.Add("Range", "bytes=0-0")
 		resp, _, err := DialTimeout(req)
 		if err != nil {
-			return
+			return err
 		}
 		r := resp.Header.Get("Content-Range")
 		if r == "" {
-			return
+			return nil
 		}
 		// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Range
 		//
@@ -340,6 +363,8 @@ func (m *webUrl) Extract() {
 		}
 		m.r = true
 	}
+
+	return nil
 }
 
 type webSeed struct {
@@ -464,6 +489,9 @@ func (m *webSeed) Run(req *http.Request) {
 			return // start next webSeed
 		}
 		m.t.WriteChunk(offset, buf[:n], m.ws.chunks)
+
+		m.url.downloaded += n
+		m.url.downloading += n
 
 		offset += int64(n)
 
