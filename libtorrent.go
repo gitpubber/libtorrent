@@ -435,8 +435,6 @@ func startTorrent(t *torrent.Torrent) bool {
 		mu.Lock()
 		defer mu.Unlock()
 
-		fileUpdateCheck(t)
-
 		now := time.Now().UnixNano()
 		if pendingCompleted(t) { // seeding
 			fs.SeedingTime = fs.SeedingTime + (now - fs.ActivateDate)
@@ -445,6 +443,8 @@ func startTorrent(t *torrent.Torrent) bool {
 			webSeedStart(t)
 		}
 		fs.ActivateDate = now
+
+		fileUpdateCheck(t)
 	}()
 
 	go func() {
