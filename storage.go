@@ -64,7 +64,7 @@ type fileStorage struct {
 	CreatedOn int64
 	Comment   string
 
-	UrlList metainfo.UrlList
+	UrlList []WebSeed
 }
 
 func registerFileStorage(info metainfo.Hash, path string) *fileStorage {

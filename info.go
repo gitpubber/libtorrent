@@ -140,10 +140,10 @@ func TorrentPendingBytesCompleted(i int) int64 {
 }
 
 type StatsTorrent struct {
-	Downloaded  int64
-	Uploaded    int64
-	Downloading int64
-	Seeding     int64
+	Downloaded  int64 // bytes
+	Uploaded    int64 // bytes
+	Downloading int64 // time
+	Seeding     int64 // time
 }
 
 func TorrentStats(i int) *StatsTorrent {

@@ -135,7 +135,9 @@ func saveTorrentState(t *torrent.Torrent) ([]byte, error) {
 	s.Creator = fs.Creator
 	s.CreatedOn = fs.CreatedOn
 
-	s.UrlList = fs.UrlList
+	for _, u := range fs.UrlList {
+		s.UrlList = append(s.UrlList, u.Url)
+	}
 
 	if t.Info() != nil {
 		torrentstorageLock.Lock()
@@ -229,7 +231,9 @@ func loadTorrentState(path string, buf []byte) (t *torrent.Torrent, err error) {
 	fs.Creator = s.Creator
 	fs.CreatedOn = s.CreatedOn
 
-	fs.UrlList = s.UrlList
+	for _, u := range s.UrlList {
+		fs.UrlList = append(fs.UrlList, WebSeed{Url: u})
+	}
 
 	return
 }
