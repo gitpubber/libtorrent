@@ -423,7 +423,7 @@ func startTorrent(t *torrent.Torrent) bool {
 
 	lpdForce()
 
-	fs.ActivateDate = time.Now().UnixNano()
+	fs.ActivateDate = time.Now().UnixNano() // activate time now
 
 	go func() {
 		select {
@@ -435,12 +435,12 @@ func startTorrent(t *torrent.Torrent) bool {
 		mu.Lock()
 		defer mu.Unlock()
 
+		// update time between start and GotInfo
 		now := time.Now().UnixNano()
 		if pendingCompleted(t) { // seeding
 			fs.SeedingTime = fs.SeedingTime + (now - fs.ActivateDate)
 		} else { // downloading
 			fs.DownloadingTime = fs.DownloadingTime + (now - fs.ActivateDate)
-			webSeedStart(t)
 		}
 		fs.ActivateDate = now
 
