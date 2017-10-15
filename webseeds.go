@@ -29,7 +29,7 @@ const WEBSEED_TIMEOUT = time.Duration(5 * time.Second) // dial up and socket rea
 
 var webseedstorage map[metainfo.Hash]*webSeeds
 
-type WebSeed struct {
+type WebSeedUrl struct {
 	Url        string
 	Downloaded int64  // total bytes / speed test
 	Error      string // error if url were removed
@@ -46,7 +46,7 @@ func TorrentWebSeedsCount(i int) int {
 	return len(fs.UrlList)
 }
 
-func TorrentWebSeeds(i int, p int) *WebSeed {
+func TorrentWebSeeds(i int, p int) *WebSeedUrl {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -84,8 +84,9 @@ func webSeedStart(t *torrent.Torrent) {
 		if len(uu) == 0 { // no webseed urls? exit
 			return
 		}
-		for _, u := range uu {
-			e := &webUrl{url: u.Url}
+		for i := range uu {
+			u := &uu[i]
+			e := &webUrl{url: u.Url, ws: u}
 			ws.uu[e] = true
 		}
 		mu.Unlock()
@@ -314,10 +315,10 @@ var CONTENT_RANGE = regexp.MustCompile("bytes (\\d+)-(\\d+)/(\\d+)")
 
 // web url, keep url information (resume support? mulitple connections?)
 type webUrl struct {
-	url        string // source url
-	r          bool   // http RANGE support?
-	length     int64  // file url size (content-size)
-	downloaded int64  // statistics downloaded
+	url    string // source url
+	r      bool   // http RANGE support?
+	length int64  // file url size (content-size)
+	ws     *WebSeedUrl
 }
 
 func (m *webUrl) Extract() error {
@@ -475,7 +476,7 @@ func (m *webSeed) Run(req *http.Request) {
 		}
 		m.t.WriteChunk(offset, buf[:n], m.ws.chunks)
 
-		m.url.downloaded += int64(n)
+		m.url.ws.Downloaded += int64(n)
 
 		offset += int64(n)
 
