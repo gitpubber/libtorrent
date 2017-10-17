@@ -93,7 +93,7 @@ func webSeedStart(t *torrent.Torrent) {
 		for u := range ws.uu {
 			err := u.Extract()
 			if err != nil {
-				u.ws.Error = err.Error()
+				ws.DeleteUrl(u, err)
 			}
 		}
 		mu.Lock()
@@ -216,7 +216,7 @@ func webSeedStart(t *torrent.Torrent) {
 		}
 		if !downloading {
 			for u := range ws.uu { // choise right url, skip url if it is limited
-				if u.e {
+				if u.e && u.n == 0 {
 					count := ws.UrlUseCount(u) // how many concurent downloads per url
 					if count < WEBSEED_URL_CONCURENT {
 						w := &webSeed{ws, t, u, f, f.start, f.end, nil}
@@ -234,7 +234,7 @@ func webSeedStart(t *torrent.Torrent) {
 	// all files downloading in the array, find first and split it
 	for w1 := range ws.ww {
 		for u := range ws.uu { // choise right url, skip url if it is limited
-			if u.e && u.r {
+			if u.e && u.r && u.n == 0 {
 				count := ws.UrlUseCount(u) // how many concurent downloads per url
 				if count < WEBSEED_URL_CONCURENT {
 					fileParts := w1.file.bmmax - w1.file.bmmin + 1 // how many undownloaded pieces in a file
@@ -261,17 +261,20 @@ func webSeedStart(t *torrent.Torrent) {
 		}
 	}
 
+	now := time.Now().UnixNano()
 	for u := range ws.uu { // check if we have not extracted url (timeout on first call)
-		if !u.e {
+		if !u.e || u.n > now {
 			u.ws.Error = ""
+			u.n = 0
+			u.e = false
 			err := u.Extract()
 			if err != nil {
-				u.ws.Error = err.Error()
+				ws.DeleteUrl(u, err)
 			}
 			if u.e {
 				webSeedStart(t)
 			}
-			return // extracte one by one
+			return // no next. extracte one by one
 		}
 	}
 }
@@ -341,11 +344,12 @@ var CONTENT_RANGE = regexp.MustCompile("bytes (\\d+)-(\\d+)/(\\d+)")
 
 // web url, keep url information (resume support? mulitple connections?)
 type webUrl struct {
-	url    string // source url
-	e      bool   // extracted?
-	r      bool   // http RANGE support?
-	length int64  // file url size (content-size)
-	ws     *WebSeedUrl
+	url    string      // source url
+	e      bool        // extracted?
+	r      bool        // http RANGE support?
+	length int64       // file url size (content-size)
+	ws     *WebSeedUrl // user url object
+	n      int64       // restore deleted url after
 }
 
 func (m *webUrl) Extract() error {
@@ -555,6 +559,6 @@ func (m *webSeeds) UrlUseCount(u *webUrl) int {
 }
 
 func (m webSeeds) DeleteUrl(u *webUrl, err error) {
-	delete(m.uu, u)
 	u.ws.Error = err.Error()
+	u.n = time.Now().Add(WEBSEED_TIMEOUT).UnixNano()
 }
