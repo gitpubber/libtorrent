@@ -207,9 +207,7 @@ func webSeedStart(t *torrent.Torrent) {
 			ws.uu[e] = true
 		}
 		for u := range ws.uu {
-			mu.Unlock()
 			err := ws.Extract(u)
-			mu.Lock()
 			if err != nil {
 				ws.DeleteUrl(u, err)
 			}
@@ -273,9 +271,7 @@ func webSeedStart(t *torrent.Torrent) {
 			u.wsu.Error = ""
 			u.n = 0
 			u.e = false
-			mu.Unlock()
 			err := ws.Extract(u)
-			mu.Lock()
 			if err != nil {
 				ws.DeleteUrl(u, err)
 			}
@@ -612,5 +608,8 @@ func (m *webSeeds) Extract(u *webUrl) error {
 			break
 		}
 	}
-	return u.Extract(path)
+	mu.Unlock()
+	err := u.Extract(path)
+	mu.Lock()
+	return err
 }
