@@ -60,6 +60,17 @@ func TorrentWebSeeds(i int, p int) *WebSeedUrl {
 // sine we can dynamically add / done webSeeds, we have add one per call
 func webSeedStart(t *torrent.Torrent) {
 	hash := t.InfoHash()
+
+	if _, ok := active[t]; !ok {
+		return // called on paused torrent
+	}
+
+	fs := filestorage[hash]
+
+	if fs == nil {
+		return // called on closed torrent
+	}
+
 	var ws *webSeeds
 	if w, ok := webseedstorage[hash]; ok { // currenlty active webseeds for torrent
 		ws = w
@@ -76,8 +87,6 @@ func webSeedStart(t *torrent.Torrent) {
 		return
 	}
 
-	fs := filestorage[t.InfoHash()]
-
 	if ws.uu == nil {
 		ws.uu = make(map[*webUrl]bool)
 		if len(fs.UrlList) == 0 { // no webseed urls? exit
@@ -93,7 +102,7 @@ func webSeedStart(t *torrent.Torrent) {
 		for u := range ws.uu {
 			err := u.Extract()
 			if err != nil {
-				u.ws.Error = err.Error()
+				ws.DeleteUrl(u, err)
 			}
 		}
 		mu.Lock()
@@ -216,62 +225,74 @@ func webSeedStart(t *torrent.Torrent) {
 		}
 		if !downloading {
 			for u := range ws.uu { // choise right url, skip url if it is limited
-				if u.e {
-					count := ws.UrlUseCount(u) // how many concurent downloads per url
-					if count < WEBSEED_URL_CONCURENT {
-						w := &webSeed{ws, t, u, f, f.start, f.end, nil}
-						ws.ww[w] = true
-						w.Start()
-						webSeedStart(t)
-						return
-					}
+				if ws.Ready(u) {
+					w := &webSeed{ws, t, u, f, f.start, f.end, nil}
+					ws.ww[w] = true
+					w.Start()
+					webSeedStart(t)
+					return
 				}
 			}
-			return // exit if no url found, all url limited or broken
 		}
 	}
 
 	// all files downloading in the array, find first and split it
 	for w1 := range ws.ww {
 		for u := range ws.uu { // choise right url, skip url if it is limited
-			if u.e && u.r {
-				count := ws.UrlUseCount(u) // how many concurent downloads per url
-				if count < WEBSEED_URL_CONCURENT {
-					fileParts := w1.file.bmmax - w1.file.bmmin + 1 // how many undownloaded pieces in a file
-					splitCount := WEBSEED_CONCURENT
-					piecesGrab := fileParts / splitCount // how many pieces to grab per webSeed
-					for int64(piecesGrab)*pieceLength < WEBSEED_SPLIT && splitCount > 1 {
-						splitCount-- // webSeed smaller then WEBSEED_SPLIT, increase side by reducing splits
-						piecesGrab = fileParts / splitCount
-					}
-					if splitCount > 1 { // abble to split?
-						w1l := w1.end - w1.start // w pices to download
-						if w1l > piecesGrab {
-							end := w1.end
-							w1.end = w1.start + piecesGrab
-							w2 := &webSeed{ws, t, u, w1.file, w1.end, end, nil}
-							ws.ww[w2] = true
-							w2.Start()
-							webSeedStart(t)
-							return
-						}
+			if ws.Ready(u) && u.r {
+				fileParts := w1.file.bmmax - w1.file.bmmin + 1 // how many undownloaded pieces in a file
+				splitCount := WEBSEED_CONCURENT
+				piecesGrab := fileParts / splitCount // how many pieces to grab per webSeed
+				for int64(piecesGrab)*pieceLength < WEBSEED_SPLIT && splitCount > 1 {
+					splitCount-- // webSeed smaller then WEBSEED_SPLIT, increase side by reducing splits
+					piecesGrab = fileParts / splitCount
+				}
+				if splitCount > 1 { // abble to split?
+					w1l := w1.end - w1.start // w pices to download
+					if w1l > piecesGrab {
+						end := w1.end
+						w1.end = w1.start + piecesGrab
+						w2 := &webSeed{ws, t, u, w1.file, w1.end, end, nil}
+						ws.ww[w2] = true
+						w2.Start()
+						webSeedStart(t)
+						return
 					}
 				}
 			}
 		}
 	}
 
+	now := time.Now().UnixNano()
 	for u := range ws.uu { // check if we have not extracted url (timeout on first call)
-		if !u.e {
+		if !u.e || u.n > now {
 			u.ws.Error = ""
+			u.n = 0
+			u.e = false
 			err := u.Extract()
 			if err != nil {
-				u.ws.Error = err.Error()
+				ws.DeleteUrl(u, err)
 			}
 			if u.e {
 				webSeedStart(t)
 			}
-			return // extracte one by one
+			if len(ws.ww) == 0 { // check if all urls are broken and not downloading
+				all := true
+				for k := range ws.uu {
+					if k.e && k.n == 0 {
+						all = false
+					}
+				}
+				if all {
+					go func() {
+						time.Sleep(WEBSEED_TIMEOUT)
+						mu.Lock()
+						defer mu.Unlock()
+						webSeedStart(t) // then start delayed checks
+					}()
+				}
+			}
+			return // no next. extracte one by one
 		}
 	}
 }
@@ -341,11 +362,12 @@ var CONTENT_RANGE = regexp.MustCompile("bytes (\\d+)-(\\d+)/(\\d+)")
 
 // web url, keep url information (resume support? mulitple connections?)
 type webUrl struct {
-	url    string // source url
-	e      bool   // extracted?
-	r      bool   // http RANGE support?
-	length int64  // file url size (content-size)
-	ws     *WebSeedUrl
+	url    string      // source url
+	e      bool        // extracted?
+	r      bool        // http RANGE support?
+	length int64       // file url size (content-size)
+	ws     *WebSeedUrl // user url object
+	n      int64       // restore deleted url after
 }
 
 func (m *webUrl) Extract() error {
@@ -554,7 +576,17 @@ func (m *webSeeds) UrlUseCount(u *webUrl) int {
 	return count
 }
 
+func (m *webSeeds) Ready(u *webUrl) bool {
+	if u.e && u.n == 0 {
+		count := m.UrlUseCount(u) // how many concurent downloads per url
+		if count < WEBSEED_URL_CONCURENT {
+			return true
+		}
+	}
+	return false
+}
+
 func (m webSeeds) DeleteUrl(u *webUrl, err error) {
-	delete(m.uu, u)
 	u.ws.Error = err.Error()
+	u.n = time.Now().Add(WEBSEED_TIMEOUT).UnixNano()
 }
