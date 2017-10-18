@@ -532,7 +532,9 @@ func stopTorrent(t *torrent.Torrent) bool {
 		delete(pause, t)
 	}
 
-	fs := filestorage[t.InfoHash()]
+	info := t.InfoHash()
+
+	fs := filestorage[info]
 
 	webSeedStop(t)
 
@@ -658,10 +660,12 @@ func register(t *torrent.Torrent) int {
 func unregister(i int) {
 	t := torrents[i]
 
-	delete(filestorage, t.InfoHash())
+	info := t.InfoHash()
+
+	delete(filestorage, info)
 
 	torrentstorageLock.Lock()
-	delete(torrentstorage, t.InfoHash())
+	delete(torrentstorage, info)
 	torrentstorageLock.Unlock()
 
 	delete(active, t)
