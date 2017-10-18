@@ -57,19 +57,20 @@ func TorrentWebSeeds(i int, p int) *WebSeedUrl {
 	return &fs.UrlList[p]
 }
 
-// sine we can dynamically add / done webSeeds, we have add one per call
-func webSeedStart(t *torrent.Torrent) {
-	hash := t.InfoHash()
+func WebSeedStart(t *torrent.Torrent) {
+	mu.Lock()
+	defer mu.Unlock()
 
 	if _, ok := active[t]; !ok {
 		return // called on paused torrent
 	}
 
-	fs := filestorage[hash]
+	webSeedStart(t)
+}
 
-	if fs == nil {
-		return // called on closed torrent
-	}
+// sine we can dynamically add / done webSeeds, we have add one per call
+func webSeedStart(t *torrent.Torrent) {
+	hash := t.InfoHash()
 
 	var ws *webSeeds
 	if w, ok := webseedstorage[hash]; ok { // currenlty active webseeds for torrent
@@ -80,12 +81,14 @@ func webSeedStart(t *torrent.Torrent) {
 		ws.t = t
 		ws.chunks = make([][]int64, info.NumPieces())
 		ws.ww = make(map[*webSeed]bool)
+		webseedstorage[hash] = ws
 	}
-	webseedstorage[hash] = ws
 
 	if len(ws.ww) >= WEBSEED_CONCURENT { // limit? exit
 		return
 	}
+
+	fs := filestorage[hash]
 
 	if ws.uu == nil {
 		ws.uu = make(map[*webUrl]bool)
@@ -95,7 +98,7 @@ func webSeedStart(t *torrent.Torrent) {
 		for i := range fs.UrlList {
 			u := &fs.UrlList[i]
 			u.Error = "" // clear error on restarts
-			e := &webUrl{url: u.Url, ws: u}
+			e := &webUrl{url: u.Url, wsu: u}
 			ws.uu[e] = true
 		}
 		mu.Unlock()
@@ -266,7 +269,7 @@ func webSeedStart(t *torrent.Torrent) {
 	now := time.Now().UnixNano()
 	for u := range ws.uu { // check if we have not extracted url (timeout on first call)
 		if !u.e || u.n > now {
-			u.ws.Error = ""
+			u.wsu.Error = ""
 			u.n = 0
 			u.e = false
 			err := u.Extract()
@@ -286,9 +289,7 @@ func webSeedStart(t *torrent.Torrent) {
 				if all {
 					go func() {
 						time.Sleep(WEBSEED_TIMEOUT)
-						mu.Lock()
-						defer mu.Unlock()
-						webSeedStart(t) // then start delayed checks
+						WebSeedStart(t) // then start delayed checks
 					}()
 				}
 			}
@@ -366,7 +367,7 @@ type webUrl struct {
 	e      bool        // extracted?
 	r      bool        // http RANGE support?
 	length int64       // file url size (content-size)
-	ws     *WebSeedUrl // user url object
+	wsu    *WebSeedUrl // user url object
 	n      int64       // restore deleted url after
 }
 
@@ -443,13 +444,13 @@ func (m *webSeed) Run(req *http.Request) {
 
 	defer func() {
 		mu.Lock()
-		defer mu.Unlock()
 		m.autoClose()
 		if del != nil {
 			m.ws.DeleteUrl(m.url, del)
 		}
+		mu.Unlock()
 		if next {
-			webSeedStart(m.t)
+			WebSeedStart(m.t)
 		}
 	}()
 
@@ -471,15 +472,15 @@ func (m *webSeed) Run(req *http.Request) {
 	pstart := int64(min) * info.PieceLength // piece offset bytes start
 	pend := int64(max+1) * info.PieceLength // piece offset bytes end
 
-	if pstart < m.file.offset {
-		pstart = m.file.offset
+	if pstart < fstart {
+		pstart = fstart
 	}
 	if pend > fend {
 		pend = fend
 	}
 
-	rmin := pstart - fstart // RANGE offset start
-	rmax := pend - fstart   // RANGE offset end
+	rmin := pstart - fstart   // RANGE offset [min
+	rmax := pend - fstart - 1 // RANGE offset max]
 
 	if m.url.r {
 		// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Range
@@ -493,7 +494,7 @@ func (m *webSeed) Run(req *http.Request) {
 		req.Header.Add("Range", "bytes="+strconv.FormatInt(rmin, 10)+"-"+strconv.FormatInt(rmax, 10))
 	} else {
 		rmin = 0
-		rmax = pend
+		rmax = pend - 1
 	}
 
 	offsetStart := m.file.offset + rmin // torrent offset in bytes
@@ -527,7 +528,7 @@ func (m *webSeed) Run(req *http.Request) {
 		}
 		m.t.WriteChunk(offset, buf[:n], m.ws.chunks)
 
-		m.url.ws.Downloaded += int64(n)
+		m.url.wsu.Downloaded += int64(n)
 
 		offset += int64(n)
 
@@ -587,6 +588,6 @@ func (m *webSeeds) Ready(u *webUrl) bool {
 }
 
 func (m webSeeds) DeleteUrl(u *webUrl, err error) {
-	u.ws.Error = err.Error()
+	u.wsu.Error = err.Error()
 	u.n = time.Now().Add(WEBSEED_TIMEOUT).UnixNano()
 }

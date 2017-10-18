@@ -15,6 +15,8 @@ import (
 
 var filestorage map[metainfo.Hash]*fileStorage
 var storageExternal FileStorageTorrent
+var torrentstorage map[metainfo.Hash]*torrentStorage
+var torrentstorageLock sync.Mutex
 
 type FileStorageTorrent interface {
 	CreateZeroLengthFile(hash string, rel string) error
@@ -116,6 +118,7 @@ func (m *torrentStorage) Pieces() []bool {
 }
 
 func (m *torrentStorage) Completed() {
+	// lock outside
 	fb := filePendingBitmapTs(m.info, m.checks)
 
 	m.completed = true
@@ -128,9 +131,6 @@ func (m *torrentStorage) Completed() {
 		return true
 	})
 }
-
-var torrentstorage map[metainfo.Hash]*torrentStorage
-var torrentstorageLock sync.Mutex
 
 type torrentOpener struct {
 }
