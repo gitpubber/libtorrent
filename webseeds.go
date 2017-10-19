@@ -344,12 +344,11 @@ var CONTENT_RANGE = regexp.MustCompile("bytes (\\d+)-(\\d+)/(\\d+)")
 
 // web url, keep url information (resume support? mulitple connections?)
 type webUrl struct {
-	url    string      // source url
-	e      bool        // extracted?
-	r      bool        // http RANGE support?
-	length int64       // file url size (content-size)
-	wsu    *WebSeedUrl // user url object
-	n      int64       // restore deleted url after
+	url string      // source url
+	e   bool        // extracted?
+	r   bool        // http RANGE support?
+	wsu *WebSeedUrl // user url object
+	n   int64       // restore deleted url after
 }
 
 func (m *webUrl) Get(path string) (*http.Request, context.CancelFunc, error) {
@@ -391,7 +390,7 @@ func (m *webUrl) Extract(path string) error {
 		// Content-Range: bytes 200-1000/67589
 		g := CONTENT_RANGE.FindStringSubmatch(r)
 		if len(g) > 0 {
-			m.length, err = strconv.ParseInt(g[3], 10, 64)
+			_, err = strconv.ParseInt(g[3], 10, 64)
 		}
 		m.r = true // RANGE supported
 	}
