@@ -11,9 +11,10 @@ func bitmapIntersects(bm *bitmap.Bitmap, s int, e int) bool {
 }
 
 func bitmapIntersectsBm(bm *bitmap.Bitmap, w *bitmap.Bitmap) bool { // original roaring.Intersects hidden by bitmap.Bitmap
-	old := w.Len()
-	w.Sub(*bm)
-	return w.Len() != old
+	n := bm.Copy()
+	old := n.Len()
+	n.Sub(*w)
+	return n.Len() != old
 }
 
 func bitmapAnd(bm *bitmap.Bitmap, selected *bitmap.Bitmap) *bitmap.Bitmap {
