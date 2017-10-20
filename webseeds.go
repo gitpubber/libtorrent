@@ -182,8 +182,6 @@ func webSeedStart(t *torrent.Torrent) {
 		}
 		if !done {
 			f.bm.Sub(*completed)
-			f.bmstart = min
-			f.bmend = max + 1
 		} else {
 			for w := range ws.ww {
 				if w.file == f {
@@ -239,7 +237,7 @@ func webSeedStart(t *torrent.Torrent) {
 	for w1 := range ws.ww {
 		for u := range ws.uu { // choise right url, skip url if it is limited
 			if ws.UrlReady(u) && u.r {
-				fileParts := w1.file.bmstart - w1.file.bmend // how many undownloaded pieces in a file
+				fileParts := w1.file.bm.Len() // how many undownloaded pieces in a file
 				splitCount := WEBSEED_CONCURENT
 				piecesGrab := fileParts / splitCount // how many pieces to grab per webSeed
 				for int64(piecesGrab)*info.PieceLength < WEBSEED_SPLIT && splitCount > 1 {
@@ -337,8 +335,6 @@ type webFile struct {
 	start      int            // [start piece
 	end        int            // end) piece
 	bm         *bitmap.Bitmap // pieces to download
-	bmstart    int            // [start piece min
-	bmend      int            // end) piece max
 	downloaded int64          // total bytes downloaded
 }
 
