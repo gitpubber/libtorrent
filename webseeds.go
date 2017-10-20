@@ -337,7 +337,7 @@ type webUrl struct {
 	e   bool        // extracted?
 	r   bool        // http RANGE support?
 	wsu *WebSeedUrl // user url object
-	n   int64       // restore deleted url after
+	n   int64       // time, restore deleted url after
 }
 
 func (m *webUrl) Get(path string) (*http.Request, context.CancelFunc, error) {
