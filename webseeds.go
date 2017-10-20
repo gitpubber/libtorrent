@@ -530,12 +530,19 @@ func (m *webSeed) Run(req *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	r, err := ResponseReaderNew(resp)
-	if err != nil {
-		log.Println("download error", formatWebSeed(m), err)
-		next = true
-		del = err // resp only failed for multipart errors
-		return
+	var r io.Reader
+	ct := resp.Header["Content-Type"]
+	if strings.HasPrefix(ct[0], "multipart/") {
+		_, params, err := mime.ParseMediaType(ct[0])
+		if err != nil {
+			log.Println("download error", formatWebSeed(m), err)
+			del = err
+			return // no next, failed for multipart errors
+		}
+		mr := multipart.NewReader(resp.Body, params["boundary"])
+		r = &MultipartReader{mr: mr}
+	} else {
+		r = &BodyReader{resp: resp}
 	}
 
 	i := 0
@@ -682,33 +689,20 @@ func (m *webSeeds) Extract(u *webUrl) error {
 	return err
 }
 
-type ResponseReader struct {
+type BodyReader struct {
 	resp *http.Response
-	mr   *multipart.Reader
-	p    *multipart.Part
 }
 
-func ResponseReaderNew(resp *http.Response) (*ResponseReader, error) {
-	r := &ResponseReader{resp: resp}
-	ct := resp.Header["Content-Type"]
-	if strings.HasPrefix(ct[0], "multipart/") {
-		_, params, err := mime.ParseMediaType(ct[0])
-		if err != nil {
-			return nil, err
-		}
-		r.mr = multipart.NewReader(r.resp.Body, params["boundary"])
-	}
-	return r, nil
-}
-
-func (m *ResponseReader) Read(b []byte) (int, error) {
-	if m.mr != nil {
-		return m.ReadPart(b)
-	}
+func (m *BodyReader) Read(b []byte) (int, error) {
 	return m.resp.Body.Read(b)
 }
 
-func (m *ResponseReader) ReadPart(b []byte) (int, error) {
+type MultipartReader struct {
+	mr *multipart.Reader
+	p  *multipart.Part
+}
+
+func (m *MultipartReader) Read(b []byte) (int, error) {
 	if m.p == nil {
 		m.p, err = m.mr.NextPart()
 		if err != nil {
@@ -719,7 +713,7 @@ func (m *ResponseReader) ReadPart(b []byte) (int, error) {
 	if n == 0 {
 		if err == io.EOF {
 			m.p = nil
-			return m.ReadPart(b)
+			return m.Read(b)
 		}
 	}
 	return n, err
