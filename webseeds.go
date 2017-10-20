@@ -6,6 +6,8 @@ import (
 	"io"
 	"log"
 	"math"
+	"mime"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"regexp"
@@ -445,32 +447,15 @@ func (m *webSeed) Run(req *http.Request) {
 
 	info := m.t.Info()
 
-	pstart := m.start // [start url piece
-	pend := m.end     // end] url piece
-
-	if pstart < m.file.bmstart {
-		pstart = m.file.bmstart // file min piece bigger then webSeed one
-	}
-	if pend > m.file.bmend {
-		pend = m.file.bmend // file max piece lower then webSeed one
-	}
-
 	fstart := m.file.offset        // file bytes start
 	fend := fstart + m.file.length // file bytes end
 
-	start := int64(pstart) * info.PieceLength // piece offset bytes start
-	end := int64(pend) * info.PieceLength     // piece offset bytes end
-
-	if start < fstart {
-		start = fstart
-	}
+	end := int64(m.end) * info.PieceLength // bytes end by 'weebseed'
 	if end > fend {
-		end = fend
+		end = fend // bytes end by 'file'
 	}
 
-	rmin := start - fstart   // RANGE offset [min
-	rmax := end - fstart - 1 // RANGE offset max]
-
+	var parts [][]int64 // [part][rmin, rmax, size]
 	if m.url.r {
 		// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Range
 		//
@@ -480,16 +465,58 @@ func (m *webSeed) Run(req *http.Request) {
 		// Range: <unit>=<range-start>-<range-end>, <range-start>-<range-end>, <range-start>-<range-end>
 		//
 		// "Range: bytes=200-1000, 2000-6576, 19000-"
-		req.Header.Add("Range", "bytes="+strconv.FormatInt(rmin, 10)+"-"+strconv.FormatInt(rmax, 10))
+		const COMSP = ", "
+		start := -1
+		count := 0
+		bytes := "bytes="
+		fadd := func(start, count int) {
+			rmin := int64(start) * info.PieceLength
+			if rmin < fstart {
+				rmin = fstart
+			}
+			rmin = rmin - fstart
+			rmax := int64(start+count)*info.PieceLength - 1
+			if rmax > fend {
+				rmax = fend
+			}
+			rmax = rmax - fstart
+			parts = append(parts, []int64{rmin, rmax, 0})
+			bytes += strconv.FormatInt(rmin, 10) + "-" + strconv.FormatInt(rmax, 10) + COMSP
+		}
+		m.file.bm.IterTyped(func(piece int) (again bool) {
+			if piece >= m.start && piece <= m.end {
+				if piece == start+count {
+					count++
+				} else {
+					if start != -1 {
+						fadd(start, count)
+					}
+					start = piece
+					count = 1
+				}
+			}
+			return true
+		})
+		if count > 0 {
+			fadd(start, count)
+		}
+		bytes = strings.TrimSuffix(bytes, COMSP)
+		req.Header.Add("Range", bytes)
 	} else {
-		rmin = 0
-		rmax = end - 1
+		rmin := int64(0)
+		rmax := end - 1
+		parts = append(parts, []int64{rmin, rmax, 0})
 	}
 
-	offsetStart := m.file.offset + rmin // torrent offset in bytes
-	offset := offsetStart
-
 	resp, conn, err := dialTimeout(req)
+
+	mu.Lock()
+	cancel := m.cancel
+	mu.Unlock()
+	if cancel == nil { // canceled
+		return // return, no next
+	}
+
 	if err != nil {
 		log.Println("download error", formatWebSeed(m), err)
 		next = true
@@ -503,38 +530,89 @@ func (m *webSeed) Run(req *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	r, err := ResponseReaderNew(resp)
+	if err != nil {
+		log.Println("download error", formatWebSeed(m), err)
+		next = true
+		del = err // resp only failed for multipart errors
+		return
+	}
+
+	i := 0
 	buf := make([]byte, WEBSEED_BUF)
-	for true {
-		if m.cancel == nil { // canceled
+	for {
+		conn.SetDeadline(time.Now().Add(WEBSEED_TIMEOUT))
+		n, err := r.Read(buf)
+
+		mu.Lock()
+		k := int64(m.end) * info.PieceLength // update end
+		cancel := m.cancel
+		mu.Unlock()
+		if k < end {
+			end = k // new end less then old one
+		}
+		if cancel == nil { // canceled
 			return // return, no next
 		}
-		conn.SetDeadline(time.Now().Add(WEBSEED_TIMEOUT))
-		n, err := resp.Body.Read(buf)
+
 		if n == 0 { // done
-			m.file.downloaded += offset - offsetStart
+			mu.Lock()
+			for _, p := range parts {
+				m.file.downloaded += p[2]
+			}
+			mu.Unlock()
 			next = true
 			if err != io.EOF {
 				log.Println("download error", formatWebSeed(m), err)
 			}
 			return // start next webSeed
 		}
-		m.t.WriteChunk(offset, buf[:n], m.ws.chunks)
-
-		m.url.wsu.Downloaded += int64(n)
-
-		offset += int64(n)
 
 		mu.Lock()
-		k := int64(m.end) * info.PieceLength // update pend
+		m.url.wsu.Downloaded += int64(n) // speedtest
 		mu.Unlock()
-		if k < end {
-			end = k // new pend less then old one?
-		}
 
-		if offset > end { // reached end of webSeed.end (overriden by new webSeed)
-			m.file.downloaded += end - offsetStart
-			next = true
-			return // start next webSeed
+		rest := buf[:n]
+		for n > 0 {
+			p := parts[i]
+			old := p[2]
+			rmin := p[0]
+			rmax := p[1]
+			plen := rmax - rmin + 1
+			pn := old + int64(n)
+			if pn > plen {
+				n = int(plen - old)
+			}
+			offset := fstart + rmin + old
+			m.t.WriteChunk(offset, rest[:n], m.ws.chunks) // updated 'n'
+			p[2] += int64(n)
+			if p[2] >= plen {
+				i++
+			}
+
+			pend := rmin + p[2]
+			if pend > end { // reached end of webSeed.end (overriden by new webSeed)
+				mu.Lock()
+				size := int64(0)
+				for _, p := range parts {
+					pend := p[0] + p[2]
+					if pend > end {
+						s := end - pend
+						if s > 0 { // should never be < 0
+							size += s
+						}
+						break
+					}
+					size += p[2]
+				}
+				m.file.downloaded += size
+				mu.Unlock()
+				next = true
+				return // start next webSeed
+			}
+
+			rest = rest[n:]
+			n = len(rest)
 		}
 	}
 }
@@ -602,4 +680,47 @@ func (m *webSeeds) Extract(u *webUrl) error {
 		m.UrlDelete(u, err)
 	}
 	return err
+}
+
+type ResponseReader struct {
+	resp *http.Response
+	mr   *multipart.Reader
+	p    *multipart.Part
+}
+
+func ResponseReaderNew(resp *http.Response) (*ResponseReader, error) {
+	r := &ResponseReader{resp: resp}
+	ct := resp.Header["Content-Type"]
+	if strings.HasPrefix(ct[0], "multipart/") {
+		_, params, err := mime.ParseMediaType(ct[0])
+		if err != nil {
+			return nil, err
+		}
+		r.mr = multipart.NewReader(r.resp.Body, params["boundary"])
+	}
+	return r, nil
+}
+
+func (m *ResponseReader) Read(b []byte) (int, error) {
+	if m.mr != nil {
+		return m.ReadPart(b)
+	}
+	return m.resp.Body.Read(b)
+}
+
+func (m *ResponseReader) ReadPart(b []byte) (int, error) {
+	if m.p == nil {
+		m.p, err = m.mr.NextPart()
+		if err != nil {
+			return 0, err
+		}
+	}
+	n, err := m.p.Read(b)
+	if n == 0 {
+		if err == io.EOF {
+			m.p = nil
+			return m.ReadPart(b)
+		}
+	}
+	return n, err
 }
