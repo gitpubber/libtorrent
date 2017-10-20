@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"mime"
 	"mime/multipart"
 	"net"
@@ -118,7 +117,7 @@ func webSeedStart(t *torrent.Torrent) {
 					bm := &bitmap.Bitmap{}
 					bm.AddRange(int(s), int(e))
 					path := strings.Join(append([]string{ts.info.Name}, fi.Path...), "/") // keep original torrent name unrenamed
-					f := &webFile{path, offset, fi.Length, int(s), int(e), bm, -1, -1, 0} // [s, e)
+					f := &webFile{path, offset, fi.Length, int(s), int(e), bm, 0}         // [s, e)
 					ws.ff[f] = true
 				}
 				offset += fi.Length
@@ -149,7 +148,7 @@ func webSeedStart(t *torrent.Torrent) {
 					bm.AddRange(int(s), int(e))
 					if bitmapIntersectsBm(selected, bm) { // and it belong to picece selected
 						and := bitmapAnd(bm, selected)
-						f := &webFile{path, offset, fi.Length, int(s), int(e), and, -1, -1, 0}
+						f := &webFile{path, offset, fi.Length, int(s), int(e), and, 0}
 						ws.ff[f] = true
 					}
 				}
@@ -161,21 +160,13 @@ func webSeedStart(t *torrent.Torrent) {
 
 	for f := range ws.ff {
 		completed := &bitmap.Bitmap{}
-		done := true         // all pieces belong to file should be complete
-		min := math.MaxInt32 // first piece to download
-		max := -1            // last piece to download
+		done := true // all pieces belong to file should be complete
 		if f.downloaded < f.length {
 			f.bm.IterTyped(func(piece int) (again bool) {
 				if ts.completedPieces.Get(piece) {
 					completed.Add(piece)
 				} else {
 					done = false // one of the piece not complete
-					if piece < min {
-						min = piece
-					}
-					if piece > max {
-						max = piece
-					}
 				}
 				return true
 			})
