@@ -590,7 +590,7 @@ func (m *webSeed) Run(req *http.Request) {
 				i++
 			}
 
-			pend := rmin + p[2]
+			pend := fstart + rmin + p[2]
 			if pend > end { // reached end of webSeed.end (overriden by new webSeed)
 				mu.Lock()
 				size := int64(0)
