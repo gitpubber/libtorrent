@@ -525,7 +525,7 @@ func (m *webSeed) Run(req *http.Request) {
 			next = true
 			log.Println("download error", formatWebSeed(m), err)
 			del = err
-			return // next, failed for multipart errors
+			return // start next webSeed
 		}
 		mr := multipart.NewReader(resp.Body, params["boundary"])
 		r = &MultipartReader{mr: mr}
