@@ -522,9 +522,10 @@ func (m *webSeed) Run(req *http.Request) {
 	if strings.HasPrefix(ct[0], "multipart/") {
 		_, params, err := mime.ParseMediaType(ct[0])
 		if err != nil {
+			next = true
 			log.Println("download error", formatWebSeed(m), err)
 			del = err
-			return // no next, failed for multipart errors
+			return // next, failed for multipart errors
 		}
 		mr := multipart.NewReader(resp.Body, params["boundary"])
 		r = &MultipartReader{mr: mr}
