@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"mime"
 	"mime/multipart"
 	"net"
@@ -118,7 +117,7 @@ func webSeedStart(t *torrent.Torrent) {
 					bm := &bitmap.Bitmap{}
 					bm.AddRange(int(s), int(e))
 					path := strings.Join(append([]string{ts.info.Name}, fi.Path...), "/") // keep original torrent name unrenamed
-					f := &webFile{path, offset, fi.Length, int(s), int(e), bm, -1, -1, 0} // [s, e)
+					f := &webFile{path, offset, fi.Length, int(s), int(e), bm, 0}         // [s, e)
 					ws.ff[f] = true
 				}
 				offset += fi.Length
@@ -149,7 +148,7 @@ func webSeedStart(t *torrent.Torrent) {
 					bm.AddRange(int(s), int(e))
 					if bitmapIntersectsBm(selected, bm) { // and it belong to picece selected
 						and := bitmapAnd(bm, selected)
-						f := &webFile{path, offset, fi.Length, int(s), int(e), and, -1, -1, 0}
+						f := &webFile{path, offset, fi.Length, int(s), int(e), and, 0}
 						ws.ff[f] = true
 					}
 				}
@@ -161,29 +160,19 @@ func webSeedStart(t *torrent.Torrent) {
 
 	for f := range ws.ff {
 		completed := &bitmap.Bitmap{}
-		done := true         // all pieces belong to file should be complete
-		min := math.MaxInt32 // first piece to download
-		max := -1            // last piece to download
+		done := true // all pieces belong to file should be complete
 		if f.downloaded < f.length {
 			f.bm.IterTyped(func(piece int) (again bool) {
 				if ts.completedPieces.Get(piece) {
 					completed.Add(piece)
 				} else {
 					done = false // one of the piece not complete
-					if piece < min {
-						min = piece
-					}
-					if piece > max {
-						max = piece
-					}
 				}
 				return true
 			})
 		}
 		if !done {
 			f.bm.Sub(*completed)
-			f.bmstart = min
-			f.bmend = max + 1
 		} else {
 			for w := range ws.ww {
 				if w.file == f {
@@ -239,7 +228,7 @@ func webSeedStart(t *torrent.Torrent) {
 	for w1 := range ws.ww {
 		for u := range ws.uu { // choise right url, skip url if it is limited
 			if ws.UrlReady(u) && u.r {
-				fileParts := w1.file.bmstart - w1.file.bmend // how many undownloaded pieces in a file
+				fileParts := w1.file.bm.Len() // how many undownloaded pieces in a file
 				splitCount := WEBSEED_CONCURENT
 				piecesGrab := fileParts / splitCount // how many pieces to grab per webSeed
 				for int64(piecesGrab)*info.PieceLength < WEBSEED_SPLIT && splitCount > 1 {
@@ -337,8 +326,6 @@ type webFile struct {
 	start      int            // [start piece
 	end        int            // end) piece
 	bm         *bitmap.Bitmap // pieces to download
-	bmstart    int            // [start piece min
-	bmend      int            // end) piece max
 	downloaded int64          // total bytes downloaded
 }
 
@@ -350,7 +337,7 @@ type webUrl struct {
 	e   bool        // extracted?
 	r   bool        // http RANGE support?
 	wsu *WebSeedUrl // user url object
-	n   int64       // restore deleted url after
+	n   int64       // time, restore deleted url after
 }
 
 func (m *webUrl) Get(path string) (*http.Request, context.CancelFunc, error) {
@@ -530,12 +517,20 @@ func (m *webSeed) Run(req *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	r, err := ResponseReaderNew(resp)
-	if err != nil {
-		log.Println("download error", formatWebSeed(m), err)
-		next = true
-		del = err // resp only failed for multipart errors
-		return
+	var r io.Reader
+	ct := resp.Header["Content-Type"]
+	if strings.HasPrefix(ct[0], "multipart/") {
+		_, params, err := mime.ParseMediaType(ct[0])
+		if err != nil {
+			next = true
+			log.Println("download error", formatWebSeed(m), err)
+			del = err
+			return // start next webSeed
+		}
+		mr := multipart.NewReader(resp.Body, params["boundary"])
+		r = &MultipartReader{mr: mr}
+	} else {
+		r = &BodyReader{resp: resp}
 	}
 
 	i := 0
@@ -682,33 +677,20 @@ func (m *webSeeds) Extract(u *webUrl) error {
 	return err
 }
 
-type ResponseReader struct {
+type BodyReader struct {
 	resp *http.Response
-	mr   *multipart.Reader
-	p    *multipart.Part
 }
 
-func ResponseReaderNew(resp *http.Response) (*ResponseReader, error) {
-	r := &ResponseReader{resp: resp}
-	ct := resp.Header["Content-Type"]
-	if strings.HasPrefix(ct[0], "multipart/") {
-		_, params, err := mime.ParseMediaType(ct[0])
-		if err != nil {
-			return nil, err
-		}
-		r.mr = multipart.NewReader(r.resp.Body, params["boundary"])
-	}
-	return r, nil
-}
-
-func (m *ResponseReader) Read(b []byte) (int, error) {
-	if m.mr != nil {
-		return m.ReadPart(b)
-	}
+func (m *BodyReader) Read(b []byte) (int, error) {
 	return m.resp.Body.Read(b)
 }
 
-func (m *ResponseReader) ReadPart(b []byte) (int, error) {
+type MultipartReader struct {
+	mr *multipart.Reader
+	p  *multipart.Part
+}
+
+func (m *MultipartReader) Read(b []byte) (int, error) {
 	if m.p == nil {
 		m.p, err = m.mr.NextPart()
 		if err != nil {
@@ -719,7 +701,7 @@ func (m *ResponseReader) ReadPart(b []byte) (int, error) {
 	if n == 0 {
 		if err == io.EOF {
 			m.p = nil
-			return m.ReadPart(b)
+			return m.Read(b)
 		}
 	}
 	return n, err
