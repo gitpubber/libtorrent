@@ -523,6 +523,8 @@ func StopTorrent(i int) {
 
 	t := torrents[i]
 
+	defer delete(queue, t) // delete queued torrent from queue (seeded will be removed by queueEngine)
+
 	if stopTorrent(t) { // we sholuld not call queueNext on suspend torrent, otherwise it overlap ActiveTorrent
 		if pause != nil {
 			return
