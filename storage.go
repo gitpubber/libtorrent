@@ -191,10 +191,10 @@ type fileStoragePiece struct {
 	io.ReaderAt
 }
 
-func (m *fileStoragePiece) GetIsComplete() bool {
+func (m *fileStoragePiece) Completion() storage.Completion {
 	torrentstorageLock.Lock()
 	defer torrentstorageLock.Unlock()
-	return m.completedPieces.Get(m.p.Index())
+	return storage.Completion{Complete: m.completedPieces.Get(m.p.Index()), Ok: true}
 }
 
 func (m *fileStoragePiece) MarkComplete() error {

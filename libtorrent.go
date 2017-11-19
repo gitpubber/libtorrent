@@ -33,10 +33,6 @@ func SetDefaultAnnouncesList(str string) {
 	}
 }
 
-func SetClientVersion(str string) {
-	torrent.ExtendedHandshakeClientVersion = str
-}
-
 func limit(i int) *rate.Limiter {
 	l := rate.NewLimiter(rate.Inf, 0)
 	if i > 0 {
@@ -94,7 +90,7 @@ func CreateTorrentFile(root string) []byte {
 // Create libtorrent object
 //
 //export Create
-func Create() bool {
+func Create(ver string) bool {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -115,6 +111,7 @@ func Create() bool {
 	clientConfig.ListenAddr = BindAddr
 	clientConfig.UploadRateLimiter = rate.NewLimiter(rate.Inf, 0)
 	clientConfig.DownloadRateLimiter = rate.NewLimiter(rate.Inf, 0)
+	clientConfig.ExtendedHandshakeClientVersion = ver
 
 	client, err = torrent.NewClient(&clientConfig)
 	if err != nil {
