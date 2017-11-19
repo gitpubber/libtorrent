@@ -220,6 +220,8 @@ func TorrentRename(i int, n string) bool {
 	defer mu.Unlock()
 	t := torrents[i]
 
+	hash := t.InfoHash()
+
 	torrentstorageLock.Lock()
 	defer torrentstorageLock.Unlock()
 
@@ -228,11 +230,18 @@ func TorrentRename(i int, n string) bool {
 	if name == "" {
 		name = ts.info.Name
 	}
-	old := filepath.Join(ts.path, name)
-	if _, err := os.Stat(old); err == nil {
-		err = os.Rename(old, filepath.Join(ts.path, n))
+	if storageExternal != nil {
+		err = storageExternal.Rename(hash.HexString(), name, n)
 		if err != nil {
 			return false
+		}
+	} else {
+		old := filepath.Join(ts.path, name)
+		if _, err := os.Stat(old); err == nil {
+			err = os.Rename(old, filepath.Join(ts.path, n))
+			if err != nil {
+				return false
+			}
 		}
 	}
 	ts.root = n
