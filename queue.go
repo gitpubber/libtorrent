@@ -31,6 +31,9 @@ func queueStart(t *torrent.Torrent) bool {
 	q := make(map[int64]*torrent.Torrent)
 	var l []int64
 	for _, m := range torrents {
+		if m == t {
+			continue
+		}
 		if _, ok := active[m]; ok {
 			fs := filestorage[m.InfoHash()]
 			v := fs.ActivateDate
@@ -82,7 +85,7 @@ func queueStart(t *torrent.Torrent) bool {
 		return startTorrent(t)
 	}
 
-	// len(l) can't be == 0 should never be here
+	// normally should never be here.
 	stopTorrent(t)
 	queue[t] = now
 	return true
