@@ -111,7 +111,9 @@ func Create(ver string) bool {
 	clientConfig.ListenAddr = BindAddr
 	clientConfig.UploadRateLimiter = rate.NewLimiter(rate.Inf, 0)
 	clientConfig.DownloadRateLimiter = rate.NewLimiter(rate.Inf, 0)
-	clientConfig.ExtendedHandshakeClientVersion = ver
+	if ver != "" {
+		clientConfig.ExtendedHandshakeClientVersion = ver
+	}
 
 	client, err = torrent.NewClient(&clientConfig)
 	if err != nil {

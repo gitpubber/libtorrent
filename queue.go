@@ -156,6 +156,9 @@ func queueNext(t *torrent.Torrent) bool {
 	q := make(map[int64]*torrent.Torrent)
 	var l []int64
 	for m, v := range queue {
+		if m == t {
+			continue // should never happens, but sometimes queue stuck (seems like next start and stop same torrent)
+		}
 		// queue all || keep torrent resting for 30 mins
 		if len(active) < ActiveCount || v+QueueTimeout <= now {
 			q[v] = m
@@ -204,6 +207,9 @@ func queueNext(t *torrent.Torrent) bool {
 			var l []int64
 			// add all from queue
 			for m, v := range queue {
+				if m == t {
+					continue // should never happens, but sometimes queue stuck (seems like next start and stop same torrent)
+				}
 				q[v] = m
 				l = append(l, v)
 			}
