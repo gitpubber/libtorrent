@@ -120,10 +120,8 @@ func queueEngine(t *torrent.Torrent) {
 		timeout = time.Duration(QueueTimeout) * time.Nanosecond
 		mu.Lock()
 		if _, ok := active[t]; !ok { // engine should be running for active torrents only (two queueEngine on same torrent?)
-			now := time.Now().UnixNano()
-			queue[t] = now // we sholuld not call queueNext on suspend torrent, otherwise it overlap ActiveTorrent
 			mu.Unlock()
-			return
+			return // we sholuld not call queueNext on suspend torrent, otherwise it overlap ActiveTorrent
 		}
 		if pendingCompleted(t) { // seeding
 			if queueNext(t) { // we been removed, stop queue engine
@@ -161,9 +159,6 @@ func queueNext(t *torrent.Torrent) bool {
 	q := make(map[int64]*torrent.Torrent)
 	var l []int64
 	for m, v := range queue {
-		if m == t {
-			continue // should never happens, but sometimes queue stuck (seems like next start and stop same torrent)
-		}
 		// queue all || keep torrent resting for 30 mins
 		if len(active) < ActiveCount || v+QueueTimeout <= now {
 			q[v] = m
