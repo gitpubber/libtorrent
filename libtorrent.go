@@ -108,7 +108,8 @@ func Create(ver string) bool {
 
 	clientConfig.DefaultStorage = &torrentOpener{}
 	clientConfig.Seed = true
-	clientConfig.DisableAggressiveUpload = true
+	clientConfig.NoUpload = false
+	clientConfig.DisableAggressiveUpload = false
 	clientConfig.ListenAddr = BindAddr
 	clientConfig.UploadRateLimiter = rate.NewLimiter(rate.Inf, 0)
 	clientConfig.DownloadRateLimiter = rate.NewLimiter(rate.Inf, 0)
@@ -545,7 +546,7 @@ func stopTorrent(t *torrent.Torrent) bool {
 	webSeedStop(t)
 
 	if _, ok := active[t]; ok {
-		s := t.Seeding()
+		s := pendingCompleted(t) // seeding
 		t.Drop()
 		now := time.Now().UnixNano()
 		if s {
