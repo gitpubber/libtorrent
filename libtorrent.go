@@ -108,7 +108,8 @@ func Create(ver string) bool {
 
 	clientConfig.DefaultStorage = &torrentOpener{}
 	clientConfig.Seed = true
-	clientConfig.DisableAggressiveUpload = true
+	clientConfig.NoUpload = false
+	clientConfig.DisableAggressiveUpload = false
 	clientConfig.ListenAddr = BindAddr
 	clientConfig.UploadRateLimiter = rate.NewLimiter(rate.Inf, 0)
 	clientConfig.DownloadRateLimiter = rate.NewLimiter(rate.Inf, 0)
