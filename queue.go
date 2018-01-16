@@ -115,7 +115,12 @@ func queueEngine(t *torrent.Torrent) {
 			webSeedStop(t)
 			mu.Unlock()
 		case <-t.Wait():
-			return
+			mu.Lock()
+			if _, ok := active[t]; !ok { // torrent done exit
+				mu.Unlock()
+				return
+			} // else torrent been stopped by 'torrent' library, restart
+			mu.Unlock()
 		}
 		timeout = time.Duration(QueueTimeout) * time.Nanosecond
 		mu.Lock()
@@ -207,9 +212,6 @@ func queueNext(t *torrent.Torrent) bool {
 			var l []int64
 			// add all from queue
 			for m, v := range queue {
-				if m == t {
-					continue // should never happens, but sometimes queue stuck (seems like next start and stop same torrent)
-				}
 				q[v] = m
 				l = append(l, v)
 			}
