@@ -159,7 +159,7 @@ func TorrentStats(i int) *StatsTorrent {
 
 	if _, ok := active[t]; ok {
 		now := time.Now().UnixNano()
-		if t.Seeding() {
+		if pendingCompleted(t) { // seeding
 			seeding = seeding + (now - fs.ActivateDate)
 		} else {
 			downloading = downloading + (now - fs.ActivateDate)

@@ -545,7 +545,7 @@ func stopTorrent(t *torrent.Torrent) bool {
 	webSeedStop(t)
 
 	if _, ok := active[t]; ok {
-		s := t.Seeding()
+		s := pendingCompleted(t) // seeding
 		t.Drop()
 		now := time.Now().UnixNano()
 		if s {

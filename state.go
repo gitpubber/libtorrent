@@ -113,7 +113,7 @@ func saveTorrentState(t *torrent.Torrent) ([]byte, error) {
 
 	if _, ok := active[t]; ok {
 		now := time.Now().UnixNano()
-		if t.Seeding() {
+		if pendingCompleted(t) { // seeding
 			fs.SeedingTime = fs.SeedingTime + (now - fs.ActivateDate)
 		} else {
 			fs.DownloadingTime = fs.DownloadingTime + (now - fs.ActivateDate)
