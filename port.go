@@ -53,9 +53,8 @@ func localIP(gip net.IP) (ips []string) {
 			if ip == nil || ip.IsLoopback() {
 				continue
 			}
-			ip = ip.To4()
-			if ip == nil {
-				continue // not an ipv4 address
+			if !ip.IsGlobalUnicast() {
+				continue
 			}
 			if gip != nil && ip.Mask(ip.DefaultMask()).Equal(gip.Mask(gip.DefaultMask())) {
 				ips = append(ips, ip.String())
@@ -73,15 +72,15 @@ func PortCount() int {
 
 	clientPorts = portList()
 
-	if udpPort != "" {
-		clientPorts = append(clientPorts, udpPort)
-	}
-
 	return len(clientPorts)
 }
 
 func portList() []string {
 	var ports []string
+
+	if udpPort != "" { // tcpPort the same
+		ports = append(ports, udpPort)
+	}
 
 	host, port, err := net.SplitHostPort(clientAddr)
 	if err != nil {
@@ -111,12 +110,10 @@ func Port(i int) string {
 
 func PortCheck() (bool, error) {
 	port := tcpPort
-	if port == "" {
-		// check does not perfome on UDP but what we can do?
+	if port == "" { // check does not perfome on UDP but what we can do?
 		port = udpPort
 	}
-	if port == "" {
-		// ports are not forwarded? using local socket port
+	if port == "" { // ports are not forwarded? using local socket port
 		_, port, err = net.SplitHostPort(clientAddr)
 		if err != nil {
 			return false, err
