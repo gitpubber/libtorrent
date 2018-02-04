@@ -119,8 +119,9 @@ func queueEngine(t *torrent.Torrent) {
 			if _, ok := active[t]; !ok { // torrent done exit
 				mu.Unlock()
 				return
-			} // else torrent been stopped by 'torrent' library, restart
+			} // else torrent been stopped by 'torrent' library. checking? then we have to restart queueEngine
 			mu.Unlock()
+			continue // restart queueEngine
 		}
 		timeout = time.Duration(QueueTimeout) * time.Nanosecond
 		mu.Lock()
