@@ -49,7 +49,7 @@ func torrentFiles(t *torrent.Torrent) []File {
 
 	var files []File
 
-	for i, v := range t.Files(ts.root) {
+	for i, v := range t.GetFiles(ts.root) {
 		p := File{}
 		p.Check = checks[i]
 		p.Path = v.Path()
