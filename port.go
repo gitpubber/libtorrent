@@ -300,15 +300,15 @@ func mappingPort(timeout time.Duration) error {
 	}
 
 	// udp have priority we are using uTP
-	if udpPort == "" { // udp == tcp == ""
+	if udpPort == "" || tcpPort == "" { // udp == tcp == ""
+		udpPort = "" // just to be sure
 		tcpPort = ""
 		updateClientAddr(clientAddr)
 		return nil
 	}
 
 	if tcpPort != udpPort {
-		// if we got different TCP port, reset it
-		tcpPort = ""
+		tcpPort = "" // if we got different TCP port, reset it
 		updateClientAddr(udpPort)
 		return nil
 	}
@@ -325,12 +325,7 @@ func updateClientAddr(addr string) {
 	if client == nil { // already closed
 		return
 	}
-
-	old := client.ListenAddr().String()
-	if old == addr {
-		return
-	}
-	client.SetListenAddr(addr)
+	client.Config(func() { clientConfig.SetListenAddr(addr) })
 }
 
 func mappingStart() {

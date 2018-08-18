@@ -166,7 +166,7 @@ func TorrentStats(i int) *StatsTorrent {
 		}
 	}
 
-	return &StatsTorrent{stats.BytesRead, stats.BytesWritten, downloading, seeding}
+	return &StatsTorrent{stats.BytesRead.Int64(), stats.BytesWritten.Int64(), downloading, seeding}
 }
 
 type InfoTorrent struct {

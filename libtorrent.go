@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"net/http"
 	"path"
 	"strings"
@@ -19,6 +20,7 @@ import (
 )
 
 var (
+	Version                  = ""
 	SocketsPerTorrent int    = 40
 	BindAddr          string = ":53007"
 )
@@ -46,11 +48,11 @@ func limit(i int) *rate.Limiter {
 }
 
 func SetUploadRate(i int) {
-	client.SetUploadRate(limit(i))
+	client.Config(func() { clientConfig.UploadRateLimiter = limit(i) })
 }
 
 func SetDownloadRate(i int) {
-	client.SetDownloadRate(limit(i))
+	client.Config(func() { clientConfig.DownloadRateLimiter = limit(i) })
 }
 
 //export CreateTorrentFileFromMetaInfo
@@ -90,7 +92,7 @@ func CreateTorrentFile(root string) []byte {
 // Create libtorrent object
 //
 //export Create
-func Create(ver string) bool {
+func Create() bool {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -110,21 +112,20 @@ func Create(ver string) bool {
 	clientConfig.Seed = true
 	clientConfig.NoUpload = false
 	clientConfig.DisableAggressiveUpload = true
-	clientConfig.ListenAddr = BindAddr
+	clientConfig.SetListenAddr(BindAddr)
 	clientConfig.UploadRateLimiter = rate.NewLimiter(rate.Inf, 0)
 	clientConfig.DownloadRateLimiter = rate.NewLimiter(rate.Inf, 0)
-	if ver != "" {
-		clientConfig.ExtendedHandshakeClientVersion = ver
+	if Version != "" {
+		clientConfig.ExtendedHandshakeClientVersion = Version
 	}
+	clientConfig.HalfOpenConnsPerTorrent = SocketsPerTorrent
 
 	client, err = torrent.NewClient(&clientConfig)
 	if err != nil {
 		return false
 	}
 
-	client.SetHalfOpenLimit(SocketsPerTorrent)
-
-	clientAddr = client.ListenAddr().String()
+	clientAddr = ListenAddr()
 
 	lpdStart()
 
@@ -152,7 +153,7 @@ type BytesInfo struct {
 
 func Stats() *BytesInfo {
 	stats := client.Stats()
-	return &BytesInfo{stats.BytesRead, stats.BytesWritten}
+	return &BytesInfo{stats.BytesRead.Int64(), stats.BytesWritten.Int64()}
 }
 
 // Get Torrent Count
@@ -167,7 +168,7 @@ func Count() int {
 
 //export ListenAddr
 func ListenAddr() string {
-	return client.ListenAddr().String()
+	return fmt.Sprintf(":%d", client.LocalPort())
 }
 
 //export CreateTorrentFromMetaInfo
@@ -642,7 +643,7 @@ func Close() {
 // protected
 //
 
-var clientConfig torrent.Config
+var clientConfig torrent.ClientConfig
 var client *torrent.Client
 var clientAddr string
 var err error
