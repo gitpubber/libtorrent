@@ -7,7 +7,7 @@ type Peer struct {
 	Source string
 	// Peer is known to support encryption.
 	SupportsEncryption bool
-	PiecesCompleted    int
+	PiecesCompleted    int64
 	// how many data we downloaded/uploaded from peer
 	Downloaded int64
 	Uploaded   int64

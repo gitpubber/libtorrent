@@ -108,6 +108,7 @@ func Create() bool {
 	udpPort = ""
 	mappingAddr = nil
 
+	clientConfig = torrent.NewDefaultClientConfig()
 	clientConfig.DefaultStorage = &torrentOpener{}
 	clientConfig.Seed = true
 	clientConfig.NoUpload = false
@@ -120,12 +121,10 @@ func Create() bool {
 	}
 	clientConfig.HalfOpenConnsPerTorrent = SocketsPerTorrent
 
-	client, err = torrent.NewClient(&clientConfig)
+	client, err = torrent.NewClient(clientConfig)
 	if err != nil {
 		return false
 	}
-
-	clientAddr = ListenAddr()
 
 	lpdStart()
 
@@ -138,6 +137,7 @@ func Create() bool {
 	if err != nil {
 		return false
 	}
+	clientAddr = ListenAddr()
 
 	go func() {
 		mappingStart()
@@ -643,7 +643,7 @@ func Close() {
 // protected
 //
 
-var clientConfig torrent.ClientConfig
+var clientConfig *torrent.ClientConfig
 var client *torrent.Client
 var clientAddr string
 var err error
