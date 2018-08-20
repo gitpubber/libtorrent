@@ -1,12 +1,12 @@
 package libtorrent
 
 const (
-	PieceEmpty    int32 = 0
-	PieceComplete int32 = 1
-	PieceChecking int32 = 2
-	PiecePartial  int32 = 3 // when booth empty and completed
-	PieceWriting  int32 = 4 // when have partial pieces
-	PieceUnpended int32 = 5 // empy pieces can be unpended
+	PieceEmpty    int32 = 0 // gray
+	PieceComplete int32 = 1 // blue
+	PieceChecking int32 = 2 // yellow
+	PiecePartial  int32 = 3 // green, when booth empty and completed
+	PieceWriting  int32 = 4 // red, when have partial pieces
+	PieceUnpended int32 = 5 // ltgray, empy pieces can be unpended
 )
 
 func TorrentPieceLength(i int) int64 {
