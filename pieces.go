@@ -38,54 +38,7 @@ func TorrentPiecesCompactCount(i int, size int) int {
 	checking := false
 	count := 0
 
-	pos := 0
-	for _, v := range t.PieceStateRuns() {
-		for i := 0; i < v.Length; i++ {
-			if v.Complete {
-				complete = true
-			} else {
-				empty = true
-				// at least one pice pendend then mark all (size) pendent
-				if t.PiecePended(pos) {
-					pended = true
-				}
-			}
-			if v.Partial {
-				partial = true
-			}
-			if v.Checking {
-				checking = true
-			}
-			count = count + 1
-
-			if count >= size {
-				state := PieceEmpty
-				if checking {
-					state = PieceChecking
-				} else if partial {
-					state = PieceWriting
-				} else if empty && complete {
-					state = PiecePartial
-				} else if complete {
-					state = PieceComplete
-				} else if !pended {
-					state = PieceUnpended
-				} else {
-					state = PieceEmpty
-				}
-				fs.Pieces = append(fs.Pieces, state)
-
-				pended = false
-				empty = false
-				complete = false
-				partial = false
-				checking = false
-				count = 0
-			}
-			pos++
-		}
-	}
-	if count > 0 {
+	pack := func() {
 		state := PieceEmpty
 		if checking {
 			state = PieceChecking
@@ -102,13 +55,47 @@ func TorrentPiecesCompactCount(i int, size int) int {
 		}
 		fs.Pieces = append(fs.Pieces, state)
 	}
+
+	pos := 0
+	for _, v := range t.PieceStateRuns() {
+		for i := 0; i < v.Length; i++ {
+			if v.Complete {
+				complete = true
+			} else {
+				empty = true
+				if t.PiecePended(pos) { // at least one pice pendend then mark all (size) pended
+					pended = true
+				}
+			}
+			if v.Partial {
+				partial = true
+			}
+			if v.Checking {
+				checking = true
+			}
+			count = count + 1
+
+			if count >= size {
+				pack()
+				pended = false
+				empty = false
+				complete = false
+				partial = false
+				checking = false
+				count = 0
+			}
+			pos++
+		}
+	}
+	if count > 0 {
+		pack()
+	}
 	return len(fs.Pieces)
 }
 
 func TorrentPiecesCompact(i int, p int) int32 {
 	mu.Lock()
 	defer mu.Unlock()
-
 	t := torrents[i]
 	f := filestorage[t.InfoHash()]
 	return f.Pieces[p]

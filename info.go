@@ -185,6 +185,13 @@ func TorrentInfo(i int) *InfoTorrent {
 	return &InfoTorrent{fs.Creator, fs.CreatedOn, fs.Comment, fs.AddedDate, fs.CompletedDate}
 }
 
+func TorrentInfoName(i int, s string) {
+	mu.Lock()
+	defer mu.Unlock()
+	t := torrents[i]
+	t.SetDisplayName(s)
+}
+
 func TorrentInfoCreator(i int, s string) {
 	mu.Lock()
 	defer mu.Unlock()
