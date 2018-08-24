@@ -184,3 +184,19 @@ func TorrentInfo(i int) *InfoTorrent {
 	fs := filestorage[t.InfoHash()]
 	return &InfoTorrent{fs.Creator, fs.CreatedOn, fs.Comment, fs.AddedDate, fs.CompletedDate}
 }
+
+func TorrentInfoCreator(i int, s string) {
+	mu.Lock()
+	defer mu.Unlock()
+	t := torrents[i]
+	fs := filestorage[t.InfoHash()]
+	fs.Creator = s
+}
+
+func TorrentInfoComment(i int, s string) {
+	mu.Lock()
+	defer mu.Unlock()
+	t := torrents[i]
+	fs := filestorage[t.InfoHash()]
+	fs.Comment = s
+}

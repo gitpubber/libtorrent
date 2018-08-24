@@ -159,7 +159,7 @@ func wildcardToRegex(wildcard string) string {
 			s += "."
 		case '^': // escape character in cmd.exe
 			s += "\\"
-		case '(', ')', '[', ']', '$', '.', '{', '}', '|', '\\': // escape special regexp-characters
+		case '+', '(', ')', '[', ']', '$', '.', '{', '}', '|', '\\': // escape special regexp-characters
 			s += "\\"
 			s += string(c)
 		default:

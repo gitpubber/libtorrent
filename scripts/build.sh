@@ -10,12 +10,6 @@ OUT="$DIR/../"
 
 GOPATH="$OUT"
 
-"$DIR/update.sh"
-
-if [ ! -e "$GOPATH/pkg/gomobile" ]; then
-  gomobile init
-fi
-
 gomobile bind -o "$OUT/libtorrent.aar" "$@" gitlab.com/axet/libtorrent
 
 cat << EOF > "$OUT/build.gradle"
