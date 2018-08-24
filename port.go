@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/anacrolix/missinggo"
@@ -148,7 +147,12 @@ func PortCheck() (bool, error) {
 }
 
 func getPort(d nat.Device, proto nat.Protocol, port int, extPort string) (int, error) {
-	n := "libtorrent " + strings.ToLower(string(proto))
+	n := Version
+	if Version == "" {
+		n = "libtorrent"
+	} else {
+		n = Version
+	}
 
 	_, ep, err := net.SplitHostPort(extPort)
 	if err == nil && ep != "" {
