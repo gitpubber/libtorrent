@@ -19,6 +19,7 @@ import (
 )
 
 var (
+	Version                  = ""
 	SocketsPerTorrent int    = 40
 	BindAddr          string = ":53007"
 )
@@ -90,7 +91,7 @@ func CreateTorrentFile(root string) []byte {
 // Create libtorrent object
 //
 //export Create
-func Create(ver string) bool {
+func Create() bool {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -113,8 +114,8 @@ func Create(ver string) bool {
 	clientConfig.ListenAddr = BindAddr
 	clientConfig.UploadRateLimiter = rate.NewLimiter(rate.Inf, 0)
 	clientConfig.DownloadRateLimiter = rate.NewLimiter(rate.Inf, 0)
-	if ver != "" {
-		clientConfig.ExtendedHandshakeClientVersion = ver
+	if Version != "" {
+		clientConfig.ExtendedHandshakeClientVersion = Version
 	}
 
 	client, err = torrent.NewClient(&clientConfig)

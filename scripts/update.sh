@@ -25,3 +25,7 @@ go_get "gitlab.com/axet/torrent" "github.com/anacrolix/torrent"
 go get -u gitlab.com/axet/libtorrent
 
 go get -u golang.org/x/mobile/cmd/gomobile
+
+if [ ! -e "$GOPATH/pkg/gomobile" ]; then
+  gomobile init
+fi
