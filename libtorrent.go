@@ -21,7 +21,7 @@ import (
 
 var (
 	Version                  = ""
-	SocketsPerTorrent int    = 25
+	SocketsPerTorrent int    = 40
 	BindAddr          string = ":53007"
 )
 
