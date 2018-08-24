@@ -21,7 +21,7 @@ import (
 
 var (
 	Version                  = ""
-	SocketsPerTorrent int    = 40
+	SocketsPerTorrent int    = 25
 	BindAddr          string = ":53007"
 )
 
@@ -120,6 +120,8 @@ func Create() bool {
 		clientConfig.ExtendedHandshakeClientVersion = Version
 	}
 	clientConfig.HalfOpenConnsPerTorrent = SocketsPerTorrent
+	clientConfig.TorrentPeersLowWater = 2 * clientConfig.HalfOpenConnsPerTorrent
+	clientConfig.EstablishedConnsPerTorrent = clientConfig.TorrentPeersLowWater
 
 	client, err = torrent.NewClient(clientConfig)
 	if err != nil {
