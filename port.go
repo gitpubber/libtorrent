@@ -303,7 +303,7 @@ func mappingPort(timeout time.Duration) error {
 	if udpPort == "" || tcpPort == "" { // udp == tcp == ""
 		udpPort = "" // just to be sure
 		tcpPort = ""
-		updateClientAddr(clientAddr)
+		updateClientAddr("")
 		return nil
 	}
 
@@ -325,7 +325,18 @@ func updateClientAddr(addr string) {
 	if client == nil { // already closed
 		return
 	}
-	client.Config(func() { clientConfig.SetListenAddr(addr) })
+	p := 0
+	if addr != "" {
+		_, port, err := net.SplitHostPort(clientAddr)
+		if err != nil {
+			panic(err)
+		}
+		p, err = net.LookupPort("tcp", port)
+		if err != nil {
+			panic(err)
+		}
+	}
+	client.Config(func() { clientConfig.PublicIp4Port = p })
 }
 
 func mappingStart() {
@@ -371,5 +382,5 @@ func mappingStart() {
 func mappingStop() {
 	mappingClose.Set()
 	mappingAddr = nil
-	updateClientAddr(clientAddr)
+	updateClientAddr("")
 }
