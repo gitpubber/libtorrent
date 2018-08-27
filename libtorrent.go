@@ -117,6 +117,7 @@ func Create() bool {
 	if Version != "" {
 		clientConfig.ExtendedHandshakeClientVersion = Version
 	}
+	clientConfig.NoDHT = true
 
 	client, err = torrent.NewClient(&clientConfig)
 	if err != nil {
