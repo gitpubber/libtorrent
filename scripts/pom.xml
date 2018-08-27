@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.github.axet</groupId>
   <artifactId>libtorrent</artifactId>
-  <version>0.13.33</version>
+  <version>0.13.34</version>
   <packaging>aar</packaging>
   <name>android torrent library</name>
   <description>android torrent library</description>
@@ -25,14 +25,6 @@
     <developerConnection>scm:git:https://gitlab.com/axet/libtorrent</developerConnection>
     <url>https://gitlab.com/axet/libtorrent</url>
   </scm>
-  <dependencies>
-    <dependency>
-      <groupId>com.github.axet</groupId>
-      <artifactId>libcppshared</artifactId>
-      <version>r17.1.4828580</version>
-      <scope>compile</scope>
-    </dependency>
-  </dependencies>
   <build>
      <plugins>
         <plugin>
