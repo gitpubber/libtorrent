@@ -122,6 +122,7 @@ func Create() bool {
 	clientConfig.HalfOpenConnsPerTorrent = SocketsPerTorrent
 	clientConfig.TorrentPeersLowWater = 2 * clientConfig.HalfOpenConnsPerTorrent
 	clientConfig.EstablishedConnsPerTorrent = clientConfig.TorrentPeersLowWater
+	clientConfig.NoDHT = true
 
 	client, err = torrent.NewClient(clientConfig)
 	if err != nil {
