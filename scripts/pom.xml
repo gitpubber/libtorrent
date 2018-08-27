@@ -29,7 +29,7 @@
     <dependency>
       <groupId>com.github.axet</groupId>
       <artifactId>libcppshared</artifactId>
-      <version>n17</version>
+      <version>r17.1.4828580</version>
       <scope>compile</scope>
     </dependency>
   </dependencies>
