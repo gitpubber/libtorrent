@@ -19,8 +19,7 @@ var torrentstorage map[metainfo.Hash]*torrentStorage
 var torrentstorageLock sync.Mutex
 
 type FileStorageTorrent interface {
-	CreateZeroLengthFile(hash string, rel string) error
-	ReadFileAt(hash string, path string, buf *Buffer, off int64) (n int, err error) // java unable to change buf if it passed as a parameter
+	ReadFileAt(hash string, path string, buf *Buffer, off int64) (n int, err error) // java unable to change []byte buf if it passed as a parameter
 	WriteFileAt(hash string, path string, b []byte, off int64) (n int, err error)
 	Remove(hash string, path string) error
 	Rename(hash string, old string, path string) error
@@ -212,7 +211,7 @@ func (m *fileStoragePiece) MarkComplete() error {
 				continue
 			}
 			name := filepath.Join(append([]string{m.info.Name}, fi.Path...)...)
-			err := storageExternal.CreateZeroLengthFile(m.infoHash.HexString(), name)
+			_, err := storageExternal.WriteFileAt(m.infoHash.HexString(), name, []byte{}, 0)
 			if err != nil {
 				return err
 			}
