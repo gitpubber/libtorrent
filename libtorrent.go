@@ -21,6 +21,7 @@ import (
 
 var (
 	Version                  = ""
+	Bep20                    = ""
 	SocketsPerTorrent int    = 40
 	BindAddr          string = ":53007"
 )
@@ -122,6 +123,9 @@ func Create() bool {
 	clientConfig.HalfOpenConnsPerTorrent = SocketsPerTorrent
 	clientConfig.TorrentPeersLowWater = 2 * clientConfig.HalfOpenConnsPerTorrent
 	clientConfig.EstablishedConnsPerTorrent = clientConfig.TorrentPeersLowWater
+	if Bep20 != "" {
+		clientConfig.Bep20 = Bep20
+	}
 
 	client, err = torrent.NewClient(clientConfig)
 	if err != nil {
