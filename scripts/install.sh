@@ -1,4 +1,7 @@
 #!/bin/bash
+#
+# install .aar into ~/.m2 local repo
+#
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 OUT="$DIR/../"

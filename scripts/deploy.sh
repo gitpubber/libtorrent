@@ -1,4 +1,7 @@
 #!/bin/bash
+#
+# deploy .aar into maven central
+#
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 

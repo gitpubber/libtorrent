@@ -1,4 +1,7 @@
 #!/bin/bash
+#
+# set build to use shared ~/.go/pkg and ~/.go/src folders
+#
 
 set -e
 
