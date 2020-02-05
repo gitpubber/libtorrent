@@ -2,6 +2,7 @@ package libtorrent
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"math/rand"
 	"net"
@@ -205,7 +206,7 @@ func mappingPort(timeout time.Duration) error {
 		return err
 	}
 
-	dd := upnp.Discover(timeout, timeout)
+	dd := upnp.Discover(context.Background(), timeout, timeout)
 
 	u := func(d nat.Device) error {
 		ext, err := d.GetExternalIPAddress()
