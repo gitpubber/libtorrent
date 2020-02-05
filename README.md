@@ -14,7 +14,8 @@ Base Features (https://github.com/anacrolix/torrent):
  * IP Blocklists
  * Some IPv6
  * HTTP and UDP tracker clients
- * BEPs:
+
+BEPs:
   -  3: Basic BitTorrent protocol
   -  5: DHT
   -  6: Fast Extension (have all/none only)
