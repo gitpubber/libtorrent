@@ -40,9 +40,9 @@ Additional features:
   * Queue Engine (active/queued torrent list)
   * Full Contorl over torrent state (download metadata, download data, stop, pause, resume)
 
-BEPs
-    - 14: Local Peers Discovery
-    - 19: WebSeeds
+BEPs:
+  - 14: Local Peers Discovery
+  - 19: WebSeeds
 
 ## Build
 
