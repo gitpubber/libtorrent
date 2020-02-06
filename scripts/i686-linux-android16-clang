@@ -1,0 +1,9 @@
+#!/bin/bash
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+NDK=$(realpath $DIR/../../../../../)
+if [ "$1" != "-cc1" ]; then
+    $DIR/clang --target=i686-linux-android16 -I$NDK/sysroot/usr/include/ -I$NDK/sysroot/usr/include/i686-linux-android/ -gcc-toolchain $NDK/toolchains/x86-4.9/prebuilt/linux-* -L$NDK/platforms/android-16/arch-x86/usr/lib/ -B$NDK/platforms/android-16/arch-x86/usr/lib/ -Wno-error=unused-command-line-argument "$@"
+else
+    # Target is already an argument.
+    $DIR/clang "$@"
+fi

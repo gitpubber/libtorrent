@@ -9,18 +9,39 @@
 
 set -e
 
-export GOPATH=$PWD
-export GOBIN=$GOPATH/pkg/bin/
+mod() {
+  export GOPATH=$PWD/build
+  export GOBIN=$GOPATH/bin/
+  export PATH=$GOBIN:$PATH
+  export ANDROID_HOME=$HOME/Android/Sdk
+  export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/16.1.4479499/
+  go get -d golang.org/x/mobile/cmd/gomobile
+  chmod a+rw -R build
+  patch -p1 < scripts/gomobile.diff -d build/pkg/mod/golang.org/x/mobile@*/
+  go get golang.org/x/mobile/cmd/gomobile
+  gomobile init
+  gomobile bind
+}
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+export LIB=$DIR/..
+export GOPATH=$LIB/../libtorrent-build
+export GOBIN=$GOPATH/bin/
 export PATH=$GOBIN:$PATH
 export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/16.1.4479499/
 
-rm -rf pkg/*
+cp -nv $DIR/*linux-android* $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-*/bin/
 
-go get golang.org/x/mobile/cmd/gomobile
-[ -e "$GOPATH/pkg/gomobile" ] || ANDROID_HOME= gomobile init
+mkdir -p $GOPATH
+cd $GOPATH
 
-[ -e ./src/github.com/anacrolix/torrent ] || git clone https://gitlab.com/axet/torrent src/github.com/anacrolix/torrent
+[ ! -e $GOPATH/src/golang.org/x/mobile/ ] && go get -d golang.org/x/mobile/cmd/gomobile && patch -p1 < $DIR/gomobile.diff -d $GOPATH/src/golang.org/x/mobile/ && go get golang.org/x/mobile/cmd/gomobile
 
-[ -e ./src/gitlab.com/axet/libtorrent ] || ( mkdir -p ./src/gitlab.com/axet/ && ln -sf ../../../ src/gitlab.com/axet/libtorrent )
+[ ! -e "$GOPATH/pkg/gomobile" ] && gomobile init
 
-go get -d gitlab.com/axet/libtorrent
+[ ! -e ./src/github.com/anacrolix/torrent ] && git clone -b dev https://gitlab.com/axet/torrent src/github.com/anacrolix/torrent
+
+[ ! -e ./src/gitlab.com/axet/libtorrent ] && mkdir -p ./src/gitlab.com/axet/ && ln -sf $LIB src/gitlab.com/axet/libtorrent
+
+go get -tags disable_libutp -d gitlab.com/axet/libtorrent
