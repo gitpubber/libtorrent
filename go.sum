@@ -303,6 +303,8 @@ gitlab.com/axet/torrent v0.0.0-20200205141541-92b4b9e7387e h1:eI9NGcBphvA5d5WaqA
 gitlab.com/axet/torrent v0.0.0-20200205141541-92b4b9e7387e/go.mod h1:vCkQMgViw2b6GbrTECqql4o2AZCCPujZaq3iEYnH0p4=
 gitlab.com/axet/torrent v0.0.0-20200206151809-ea73a4fd2cdd h1:q1IK06OHzxmsMcJpbIGkrFtgnSTwH4YURB4P+sIXig4=
 gitlab.com/axet/torrent v0.0.0-20200206151809-ea73a4fd2cdd/go.mod h1:vCkQMgViw2b6GbrTECqql4o2AZCCPujZaq3iEYnH0p4=
+gitlab.com/axet/torrent v0.0.0-20200206164928-e487f39026da h1:x/z/i1gLkc3KvsjojmlOmztEH1rGg6qox8/6rIGbxBQ=
+gitlab.com/axet/torrent v0.0.0-20200206164928-e487f39026da/go.mod h1:vCkQMgViw2b6GbrTECqql4o2AZCCPujZaq3iEYnH0p4=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.opencensus.io v0.20.1/go.mod h1:6WKK9ahsWS3RSO+PY9ZHZUfv2irvY6gN279GOPZjmmk=
 go.opencensus.io v0.20.2/go.mod h1:6WKK9ahsWS3RSO+PY9ZHZUfv2irvY6gN279GOPZjmmk=
