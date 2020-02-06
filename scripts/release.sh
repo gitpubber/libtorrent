@@ -1,5 +1,7 @@
 #!/bin/bash
 #
+# build release version
+#
 # https://groups.google.com/forum/#!topic/go-mobile/ZstjAiIFrWY
 #
 

@@ -1,8 +1,8 @@
-diff --git a/cmd/gomobile/bind_androidapp.go b/cmd/gomobile/bind_androidapp.go
-index 9897fbd..c8505ca 100644
---- a/cmd/gomobile/bind_androidapp.go
-+++ b/cmd/gomobile/bind_androidapp.go
-@@ -247,7 +247,7 @@ func buildAAR(srcDir, androidDir string, pkgs []*build.Package, androidArchs []s
+
+diff -ru a/cmd/gomobile/bind_androidapp.go b/cmd/gomobile/bind_androidapp.go
+--- a/cmd/gomobile/bind_androidapp.go	2020-02-05 20:34:42.541391299 +0300
++++ b/cmd/gomobile/bind_androidapp.go	2020-02-05 19:40:24.097269783 +0300
+@@ -257,7 +257,7 @@
  
  const (
  	javacTargetVer = "1.7"
@@ -11,53 +11,28 @@ index 9897fbd..c8505ca 100644
  )
  
  func buildJar(w io.Writer, srcDir string) error {
-diff --git a/cmd/gomobile/build_androidapp.go b/cmd/gomobile/build_androidapp.go
-index 06b2571..85f527d 100644
---- a/cmd/gomobile/build_androidapp.go
-+++ b/cmd/gomobile/build_androidapp.go
-@@ -79,7 +79,7 @@ func goAndroidBuild(pkg *build.Package, androidArchs []string) (map[string]bool,
- 		if err != nil {
- 			return nil, err
- 		}
--		nmpkgs[arch], err = extractPkgs(toolchain.Path("nm"), libAbsPath)
-+		nmpkgs[arch], err = extractPkgs(toolchain.Path(arch, "nm"), libAbsPath)
- 		if err != nil {
- 			return nil, err
- 		}
-diff --git a/cmd/gomobile/env.go b/cmd/gomobile/env.go
-index 471b009..d0bc2b9 100644
---- a/cmd/gomobile/env.go
-+++ b/cmd/gomobile/env.go
-@@ -23,7 +23,7 @@ var (
+diff -ru a/cmd/gomobile/env.go b/cmd/gomobile/env.go
+--- a/cmd/gomobile/env.go	2020-02-05 20:34:42.541391299 +0300
++++ b/cmd/gomobile/env.go	2020-02-05 20:00:45.469315331 +0300
+@@ -22,7 +22,7 @@
  	androidArmNM string
  	darwinArmNM  string
  
 -	allArchs = []string{"arm", "arm64", "386", "amd64"}
 +	allArchs = []string{"armv5", "armv7", "arm64", "386", "amd64"}
- )
  
- func buildEnvInit() (cleanup func(), err error) {
-@@ -86,12 +86,15 @@ func envInit() (err error) {
- 		for arch, toolchain := range ndk {
+ 	bitcodeEnabled bool
+ )
+@@ -112,7 +112,7 @@
+ 			}
  			androidEnv[arch] = []string{
  				"GOOS=android",
 -				"GOARCH=" + arch,
--				"CC=" + toolchain.Path("clang"),
--				"CXX=" + toolchain.Path("clang++"),
 +				"GOARCH=" + archTool(arch),
-+				"CC=" + toolchain.Path(arch, "clang"),
-+				"CXX=" + toolchain.Path(arch, "clang++"),
+ 				"CC=" + clang,
+ 				"CXX=" + clangpp,
  				"CGO_ENABLED=1",
- 			}
--			if arch == "arm" {
-+			if arch == "armv5" {
-+				androidEnv[arch] = append(androidEnv[arch], "GOARM=5")
-+			}
-+			if arch == "armv7" {
- 				androidEnv[arch] = append(androidEnv[arch], "GOARM=7")
- 			}
- 		}
-@@ -108,8 +111,13 @@ func envInit() (err error) {
+@@ -134,8 +134,13 @@
  		var err error
  		var clang, cflags string
  		switch arch {
@@ -73,7 +48,7 @@ index 471b009..d0bc2b9 100644
  			fallthrough
  		case "arm64":
  			clang, cflags, err = envClang("iphoneos")
-@@ -125,7 +133,7 @@ func envInit() (err error) {
+@@ -155,7 +160,7 @@
  		}
  		env = append(env,
  			"GOOS=darwin",
@@ -82,7 +57,7 @@ index 471b009..d0bc2b9 100644
  			"CC="+clang,
  			"CXX="+clang+"++",
  			"CGO_CFLAGS="+cflags+" -arch "+archClang(arch),
-@@ -170,7 +178,9 @@ func envClang(sdkName string) (clang, cflags string, err error) {
+@@ -216,7 +221,9 @@
  
  func archClang(goarch string) string {
  	switch goarch {
@@ -93,7 +68,7 @@ index 471b009..d0bc2b9 100644
  		return "armv7"
  	case "arm64":
  		return "arm64"
-@@ -183,6 +193,17 @@ func archClang(goarch string) string {
+@@ -229,6 +236,17 @@
  	}
  }
  
@@ -111,101 +86,20 @@ index 471b009..d0bc2b9 100644
  // environ merges os.Environ and the given "key=value" pairs.
  // If a key is in both os.Environ and kv, kv takes precedence.
  func environ(kv []string) []string {
-@@ -235,6 +256,8 @@ func archNDK() string {
- 	} else {
- 		var arch string
- 		switch runtime.GOARCH {
-+		case "armv5":
-+			arch = "arm"
- 		case "386":
- 			arch = "x86"
- 		case "amd64":
-@@ -254,8 +277,8 @@ type ndkToolchain struct {
- 	toolPrefix string
- }
- 
--func (tc *ndkToolchain) Path(toolName string) string {
--	return filepath.Join(gomobilepath, "ndk-toolchains", tc.arch, "bin", tc.toolPrefix+"-"+toolName)
-+func (tc *ndkToolchain) Path(arch string, toolName string) string {
-+	return filepath.Join(gomobilepath, "ndk-toolchains", arch, "bin", tc.toolPrefix+"-"+toolName)
- }
- 
- type ndkConfig map[string]ndkToolchain // map: GOOS->androidConfig.
-@@ -269,7 +292,14 @@ func (nc ndkConfig) Toolchain(arch string) ndkToolchain {
+@@ -329,7 +340,14 @@
  }
  
  var ndk = ndkConfig{
 -	"arm": {
 +	"armv5": {
-+		arch:       "arm",
-+		abi:        "armeabi",
-+		platform:   "android-14",
-+		gcc:        "arm-linux-androideabi-4.9",
-+		toolPrefix: "arm-linux-androideabi",
++		arch:        "arm",
++		abi:         "armeabi",
++		minAPI:      9,
++		toolPrefix:  "arm-linux-androideabi",
++		clangPrefix: "armv5-linux-androideabi",
 +	},
 +	"armv7": {
- 		arch:       "arm",
- 		abi:        "armeabi-v7a",
- 		platform:   "android-16",
-diff --git a/cmd/gomobile/init.go b/cmd/gomobile/init.go
-index fba9308..c84724c 100644
---- a/cmd/gomobile/init.go
-+++ b/cmd/gomobile/init.go
-@@ -8,6 +8,7 @@ import (
- 	"bytes"
- 	"errors"
- 	"fmt"
-+	"html/template"
- 	"io"
- 	"io/ioutil"
- 	"os"
-@@ -145,6 +146,16 @@ func runInit(cmd *command) error {
- 	return nil
- }
- 
-+const CLANG = `#!/bin/bash
-+
-+if [ "$1" != "-cc1" ]; then
-+    $(dirname $0)/{{.clang}} -target armv5-none-linux-androideabi --sysroot $(dirname $0)/../sysroot -D__ANDROID_API__=14 "$@"
-+else
-+    # target/triple already spelled out.
-+    $(dirname $0)/{{.clang}} "$@"
-+fi
-+`
-+
- func installNDKToolchains(gomobilepath string) error {
- 	if initNDK == "" {
- 		return nil
-@@ -160,11 +171,22 @@ func installNDKToolchains(gomobilepath string) error {
- 			"build/tools/make_standalone_toolchain.py",
- 			"--arch="+t.arch,
- 			"--api="+api,
--			"--install-dir="+filepath.Join(gomobilepath, "ndk-toolchains", t.arch))
-+			"--install-dir="+filepath.Join(gomobilepath, "ndk-toolchains", arch))
- 		cmd.Dir = initNDK
- 		if err := runCmd(cmd); err != nil {
- 			return err
- 		}
-+		if arch == "armv5" {
-+			t := template.Must(template.New("main").Parse(CLANG))
-+			clang := &bytes.Buffer{}
-+			t.Execute(clang, map[string]interface{}{"clang": "clang50"})
-+			clangpp := &bytes.Buffer{}
-+			t.Execute(clangpp, map[string]interface{}{"clang": template.HTML("clang50++")})
-+			ioutil.WriteFile(filepath.Join(gomobilepath, "ndk-toolchains", arch, "bin", "clang"), clang.Bytes(), 0755)
-+			ioutil.WriteFile(filepath.Join(gomobilepath, "ndk-toolchains", arch, "bin", "clang++"), clangpp.Bytes(), 0755)
-+			ioutil.WriteFile(filepath.Join(gomobilepath, "ndk-toolchains", arch, "bin", "arm-linux-androideabi-clang"), clang.Bytes(), 0755)
-+			ioutil.WriteFile(filepath.Join(gomobilepath, "ndk-toolchains", arch, "bin", "arm-linux-androideabi-clang++"), clangpp.Bytes(), 0755)
-+		}
- 	}
- 	return nil
- }
-@@ -232,7 +254,7 @@ func installOpenAL(gomobilepath string) error {
- 		if abi == "arm" {
- 			abi = "armeabi"
- 		}
--		tcPath := filepath.Join(gomobilepath, "ndk-toolchains", t.arch, "bin")
-+		tcPath := filepath.Join(gomobilepath, "ndk-toolchains", arch, "bin")
- 		make := filepath.Join(tcPath, "make")
- 		// Split android-XX to get the api version.
- 		buildDir := alTmpDir + "/build/" + abi
+ 		arch:        "arm",
+ 		abi:         "armeabi-v7a",
+ 		minAPI:      16,
+

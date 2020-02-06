@@ -14,7 +14,8 @@ Base Features (https://github.com/anacrolix/torrent):
  * IP Blocklists
  * Some IPv6
  * HTTP and UDP tracker clients
- * BEPs:
+
+BEPs:
   -  3: Basic BitTorrent protocol
   -  5: DHT
   -  6: Fast Extension (have all/none only)
@@ -36,11 +37,12 @@ Additional features:
   * UPnP / PMP
   * Rename Torrent top folder
   * Runtime torrent states (save state between restarts)
-  * BEPs
-    - 14: Local Peers Discovery
-    - 19: WebSeeds
   * Queue Engine (active/queued torrent list)
   * Full Contorl over torrent state (download metadata, download data, stop, pause, resume)
+
+BEPs
+    - 14: Local Peers Discovery
+    - 19: WebSeeds
 
 ## Build
 
