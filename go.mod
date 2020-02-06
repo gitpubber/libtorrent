@@ -9,4 +9,4 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 )
 
-replace github.com/anacrolix/torrent v1.13.0 => gitlab.com/axet/torrent libtorrent-0.14.1
+replace github.com/anacrolix/torrent v1.13.0 => gitlab.com/axet/torrent v0.0.0-20200206164928-e487f39026da

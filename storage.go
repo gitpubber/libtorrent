@@ -210,7 +210,13 @@ func (m *fileStoragePiece) MarkComplete() error {
 			if fi.Length != 0 {
 				continue
 			}
-			name := filepath.Join(append([]string{m.info.Name}, fi.Path...)...)
+			var path []string
+			if len(fi.PathUTF8) != 0 {
+				path = fi.PathUTF8
+			} else {
+				path = fi.Path
+			}
+			name := filepath.Join(append([]string{m.info.Name}, path...)...)
 			_, err := storageExternal.WriteFileAt(m.infoHash.HexString(), name, []byte{}, 0)
 			if err != nil {
 				return err
@@ -357,7 +363,13 @@ func (fst *fileStorageTorrent) fileRel(fi metainfo.FileInfo) string {
 	if name == "" { // torrent hasen't been renamed
 		name = fst.info.Name // use original name
 	}
-	return filepath.Join(append([]string{name}, fi.Path...)...)
+	var path []string
+	if len(fi.PathUTF8) != 0 {
+		path = fi.PathUTF8
+	} else {
+		path = fi.Path
+	}
+	return filepath.Join(append([]string{name}, path...)...)
 }
 
 func (fst *fileStorageTorrent) fileRoot(rel string) string {
