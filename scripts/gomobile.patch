@@ -102,4 +102,16 @@ diff -ru a/cmd/gomobile/env.go b/cmd/gomobile/env.go
  		arch:        "arm",
  		abi:         "armeabi-v7a",
  		minAPI:      16,
+diff -ru a/cmd/gomobile/bind.go b/cmd/gomobile/bind.go
+--- a/cmd/gomobile/bind.go	2020-02-23 13:24:23.185864297 +0300
++++ b/cmd/gomobile/bind.go	2020-02-23 13:24:25.061840995 +0300
+@@ -301,7 +301,7 @@
+ 	}
+ 
+ 	return writeFile(filepath.Join(tmpdir, "src", "go.mod"), func(w io.Writer) error {
+-		f, err := getModuleVersions(targetOS, targetArch, ".")
++		f, err := getModuleVersions(targetOS, archTool(targetArch), ".")
+ 		if err != nil {
+ 			return err
+ 		}
 

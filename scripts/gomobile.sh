@@ -21,7 +21,7 @@ mod() {
   export PATH=$GOBIN:$PATH
   export ANDROID_HOME=$HOME/Android/Sdk
   export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/16.1.4479499/
-  [ ! -e build/pkg/mod/golang.org/x/mobile@*/ ] && go get -d golang.org/x/mobile/cmd/gomobile && chmod a+rw -R build && patch -p1 < scripts/gomobile.patch -d build/pkg/mod/golang.org/x/mobile@*/ && go get golang.org/x/mobile/cmd/gomobile
+  [ ! -e build/pkg/mod/golang.org/x/mobile@*/ ] && go get -d golang.org/x/mobile/cmd/gomobile && chmod u+rw -R build && patch -p1 < scripts/gomobile.patch -d build/pkg/mod/golang.org/x/mobile@*/ && go get golang.org/x/mobile/cmd/gomobile
   gomobile init
 }
 
