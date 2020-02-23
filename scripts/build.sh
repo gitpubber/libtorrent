@@ -6,7 +6,7 @@
 set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-OUT="$DIR/../"
+OUT="."
 
 gomobile bind -tags disable_libutp -o "$OUT/libtorrent.aar" "$@" gitlab.com/axet/libtorrent
 
