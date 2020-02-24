@@ -94,7 +94,7 @@ diff -ru a/cmd/gomobile/env.go b/cmd/gomobile/env.go
 +	"armv5": {
 +		arch:        "arm",
 +		abi:         "armeabi",
-+		minAPI:      9,
++		minAPI:      14,
 +		toolPrefix:  "arm-linux-androideabi",
 +		clangPrefix: "armv5-linux-androideabi",
 +	},
