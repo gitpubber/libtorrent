@@ -22,6 +22,7 @@ mod() {
   export PATH=$GOBIN:$PATH
   export ANDROID_HOME=$HOME/Android/Sdk
   export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/16.1.4479499/
+  cp -nv $DIR/*linux-android* $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-*/bin/
   [ ! -e $GOPATH/pkg/mod/golang.org/x/mobile@*/ ] && go get -d golang.org/x/mobile/cmd/gomobile && chmod u+rw -R $GOPATH && patch -p1 < $DIR/gomobile.patch -d $GOPATH/pkg/mod/golang.org/x/mobile@*/ && go get golang.org/x/mobile/cmd/gomobile
   [ ! -e "$GOPATH/pkg/gomobile" ] && gomobile init
 }
