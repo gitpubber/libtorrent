@@ -6,23 +6,24 @@
 #
 # sdkmanager --install "ndk;16.1.4479499"
 #
-# source ./scripts/gomobile.sh mod
+# source ./scripts/gomobile.sh mod || true; set +e
 # ./scripts/debug.sh
 #
-# source ./scripts/gomobile.sh work
+# source ./scripts/gomobile.sh work || true; set +e
 # ../libtorrent/scripts/debug.sh
 #
 
 set -e
 
 mod() {
+  DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   export GOPATH=$PWD/build
   export GOBIN=$GOPATH/bin/
   export PATH=$GOBIN:$PATH
   export ANDROID_HOME=$HOME/Android/Sdk
   export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/16.1.4479499/
-  [ ! -e build/pkg/mod/golang.org/x/mobile@*/ ] && go get -d golang.org/x/mobile/cmd/gomobile && chmod u+rw -R build && patch -p1 < scripts/gomobile.patch -d build/pkg/mod/golang.org/x/mobile@*/ && go get golang.org/x/mobile/cmd/gomobile
-  gomobile init
+  [ ! -e $GOPATH/pkg/mod/golang.org/x/mobile@*/ ] && go get -d golang.org/x/mobile/cmd/gomobile && chmod u+rw -R $GOPATH && patch -p1 < $DIR/gomobile.patch -d $GOPATH/pkg/mod/golang.org/x/mobile@*/ && go get golang.org/x/mobile/cmd/gomobile
+  [ ! -e "$GOPATH/pkg/gomobile" ] && gomobile init
 }
 
 work() {
