@@ -44,9 +44,9 @@ work() {
 
   [ ! -e "$GOPATH/pkg/gomobile" ] && gomobile init
 
-  [ ! -e ./src/github.com/anacrolix/torrent ] && git clone https://gitlab.com/axet/torrent src/github.com/anacrolix/torrent
+  [ ! -e $GOPATH/src/github.com/anacrolix/torrent ] && git clone https://gitlab.com/axet/torrent $GOPATH/src/github.com/anacrolix/torrent
 
-  [ ! -e ./src/gitlab.com/axet/libtorrent ] && mkdir -p ./src/gitlab.com/axet/ && ln -sf $LIB src/gitlab.com/axet/libtorrent
+  [ ! -e $GOPATH/src/gitlab.com/axet/libtorrent ] && mkdir -p $GOPATH/src/gitlab.com/axet/ && ln -sf $LIB $GOPATH/src/gitlab.com/axet/libtorrent
 
   go get -tags disable_libutp -d gitlab.com/axet/libtorrent
 }
