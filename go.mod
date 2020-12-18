@@ -1,4 +1,4 @@
-module gitlab.com/axet/libtorrent
+module github.com/gitpubber/libtorrent
 
 go 1.13
 
